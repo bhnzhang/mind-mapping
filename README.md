@@ -23,3 +23,9 @@ Open `index.html` in a browser. No installation or account is needed.
 - **Save or open a file:** Use **Save file** to download the current map as `.openmap.json`. **Open file** imports a saved map as a new map in your sidebar.
 
 The default oval style is gray with a black outline. Color groups are optional.
+
+## GitHub Pages
+
+This is a static site: `index.html` loads the local `styles.css` and `script.js` files without a build step. After pushing to a public GitHub repository, enable Pages with **Deploy from a branch**, select `main`, and choose **/ (root)**. The site will be available at `https://<owner>.github.io/<repository>/`.
+
+Maps are stored in the browser's `localStorage` for the site's address. They persist across reloads in that browser, but they do not sync across devices or automatically transfer from the local `file://` version. Use **Save file** on the local version and **Open file** on the hosted version to move a map. Keep JSON exports as backups in case browser storage is cleared.
