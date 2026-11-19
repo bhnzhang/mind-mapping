@@ -17,7 +17,8 @@ Open `index.html` in a browser. No installation or account is needed.
 - **Fit all:** Click the ⛶ button beside Undo and Redo to center every oval and fit the map on screen.
 - **Connect ovals:** Drag from anywhere on an oval's outline to another oval. A click on the outline still selects or colors the oval.
 - **Delete a connection:** Click its line, then press Delete/Backspace or click **Delete link** in the footer.
-- **Resize an oval:** Select it and drag any of the four corner squares.
+- **Resize an oval:** Select it and drag any of the four corner squares. There is no maximum size.
+- **Search bubbles:** Type in the sidebar search field to highlight bubbles whose text contains your search, regardless of letter case. Other bubbles fade; clear the field to show them normally.
 - **Color groups:** Pick a rainbow color in the sidebar, then click anywhere inside ovals to toggle that color. An oval can belong to several groups. **Erase colors** removes the colors from ovals you click. **Clear all colors** removes every oval's colors on the current map in one undoable step.
 - **Undo or redo:** Use the toolbar buttons, Ctrl+Z/Ctrl+Shift+Z, or Ctrl+Y.
 - **Delete an oval:** Select it and press Delete/Backspace.

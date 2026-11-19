@@ -20,7 +20,7 @@
       </header>
 
       <div class="main">
-        <aside class="palette" aria-label="Color groups">
+        <aside class="palette" aria-label="Map tools">
           <section class="sidebar-section">
             <div class="palette-title">Maps</div>
             <div class="map-list" id="map-list"></div>
@@ -32,6 +32,11 @@
               <button class="tool-option" id="open-file" type="button">↑ Open file</button>
             </div>
             <input id="file-input" type="file" accept=".json,.openmap,application/json" hidden />
+          </section>
+          <section class="sidebar-section">
+            <label class="palette-title" for="search-nodes">Search bubbles</label>
+            <input id="search-nodes" class="search-input" type="search" placeholder="Search text" autocomplete="off" />
+            <div id="search-count" class="search-count" aria-live="polite"></div>
           </section>
           <section class="sidebar-section">
           <div class="palette-title">Color groups</div>

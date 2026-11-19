@@ -24,6 +24,8 @@ const nodesLayer = document.querySelector("#nodes");
 const connectionsLayer = document.querySelector("#connections");
 const paletteLayer = document.querySelector("#palette-colors");
 const mapList = document.querySelector("#map-list");
+const searchInput = document.querySelector("#search-nodes");
+const searchCount = document.querySelector("#search-count");
 const newMapButton = document.querySelector("#new-map");
 const duplicateMapButton = document.querySelector("#duplicate-map");
 const renameMapButton = document.querySelector("#rename-map");
@@ -54,8 +56,8 @@ function normalizeMap(raw, fallbackName = "Imported map") {
     id: node.id,
     x: Number.isFinite(node.x) ? node.x : 1000,
     y: Number.isFinite(node.y) ? node.y : 700,
-    width: Number.isFinite(node.width) ? clamp(node.width, MIN_WIDTH, 600) : DEFAULT_WIDTH,
-    height: Number.isFinite(node.height) ? clamp(node.height, MIN_HEIGHT, 300) : DEFAULT_HEIGHT,
+    width: Number.isFinite(node.width) ? Math.max(node.width, MIN_WIDTH) : DEFAULT_WIDTH,
+    height: Number.isFinite(node.height) ? Math.max(node.height, MIN_HEIGHT) : DEFAULT_HEIGHT,
     text: typeof node.text === "string" ? node.text.slice(0, 100) : "Untitled",
     groups: Array.isArray(node.groups) ? [...new Set(node.groups.filter(name => COLORS.some(color => color.name === name)))] : [],
   }));
@@ -294,6 +296,19 @@ function updateControls() {
     : "Drag to pan · Shift-drag to select ovals · Scroll to zoom";
 }
 
+function updateSearch() {
+  const query = searchInput.value.trim().toLocaleLowerCase();
+  let matches = 0;
+  for (const element of nodesLayer.children) {
+    const node = getNode(element.dataset.id);
+    const matched = !!query && node.text.toLocaleLowerCase().includes(query);
+    element.classList.toggle("search-match", matched);
+    element.classList.toggle("search-dim", !!query && !matched);
+    if (matched) matches++;
+  }
+  searchCount.textContent = query ? `${matches} of ${map.nodes.length} bubbles match` : "";
+}
+
 function renderNodes() {
   nodesLayer.replaceChildren();
   for (const node of map.nodes) {
@@ -337,6 +352,7 @@ function renderNodes() {
     nodesLayer.append(element);
   }
   updateControls();
+  updateSearch();
 }
 
 function render() { renderNodes(); renderEdges(); }
@@ -538,10 +554,10 @@ function moveResize(event) {
   const dx = point.x - resize.startX;
   const dy = point.y - resize.startY;
   let { left, right, top, bottom } = resize;
-  if (resize.corner.includes("w")) left = clamp(left + dx, right - 600, right - MIN_WIDTH);
-  else right = clamp(right + dx, left + MIN_WIDTH, left + 600);
-  if (resize.corner.includes("n")) top = clamp(top + dy, bottom - 300, bottom - MIN_HEIGHT);
-  else bottom = clamp(bottom + dy, top + MIN_HEIGHT, top + 300);
+  if (resize.corner.includes("w")) left = Math.min(left + dx, right - MIN_WIDTH);
+  else right = Math.max(right + dx, left + MIN_WIDTH);
+  if (resize.corner.includes("n")) top = Math.min(top + dy, bottom - MIN_HEIGHT);
+  else bottom = Math.max(bottom + dy, top + MIN_HEIGHT);
   node.x = left;
   node.y = top;
   node.width = right - left;
@@ -720,6 +736,7 @@ newMapButton.addEventListener("click", () => {
   switchMap(fresh.id);
 });
 duplicateMapButton.addEventListener("click", duplicateMap);
+searchInput.addEventListener("input", updateSearch);
 renameMapButton.addEventListener("click", renameMap);
 saveFileButton.addEventListener("click", saveFile);
 openFileButton.addEventListener("click", () => fileInput.click());

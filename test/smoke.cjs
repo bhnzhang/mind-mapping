@@ -10,6 +10,7 @@ class Element {
     this.children = [];
     this.dataset = {};
     this.style = {};
+    this.value = "";
     this.listeners = {};
     this.classes = new Set();
     this.classList = {
@@ -36,7 +37,7 @@ class Element {
   remove() {}
 }
 
-const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "palette-colors", "map-list", "new-map", "duplicate-map", "rename-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
+const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
 const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
 const storage = new Map();
 const document = {
@@ -71,6 +72,14 @@ elements.redo.click();
 assert.equal(run("map.name"), "Career ideas");
 
 run("map.nodes.push({ id: crypto.randomUUID(), x: 900, y: 700, width: 154, height: 82, text: 'Second', groups: [] }); commit(); render();");
+elements["search-nodes"].value = "CoN";
+elements["search-nodes"].listeners.input[0]();
+assert.equal(elements.nodes.children[1].classList.contains("search-match"), true);
+assert.equal(elements.nodes.children[0].classList.contains("search-dim"), true);
+assert.equal(elements["search-count"].textContent, "1 of 2 bubbles match");
+elements["search-nodes"].value = "";
+elements["search-nodes"].listeners.input[0]();
+assert.equal(elements.nodes.children[0].classList.contains("search-dim"), false);
 run("addEdge(map.nodes[0].id, map.nodes[1].id)");
 assert.equal(run("map.edges.length"), 1);
 const edge = elements.connections.children[0];
@@ -106,6 +115,18 @@ run(`{
   endResize({ pointerId: 2, currentTarget: grip });
 }`);
 assert.equal(run("map.nodes[0].width"), widthBefore + 20);
+run(`{
+  const node = map.nodes[0];
+  const grip = nodesLayer.children[0].children.find(child => child.className === "resize-handle se");
+  startResize({ button: 0, pointerId: 6, clientX: node.x + node.width, clientY: node.y + node.height, currentTarget: grip,
+    preventDefault() {}, stopPropagation() {} }, node.id, "se");
+  moveResize({ pointerId: 6, clientX: node.x + node.width + 1000, clientY: node.y + node.height + 500 });
+  endResize({ pointerId: 6, currentTarget: grip });
+}`);
+assert.ok(run("map.nodes[0].width") > 600);
+assert.ok(run("map.nodes[0].height") > 300);
+assert.equal(run("normalizeMap(map).nodes[0].width"), run("map.nodes[0].width"));
+assert.equal(run("normalizeMap(map).nodes[0].height"), run("map.nodes[0].height"));
 
 run("setZoom(0.5)");
 const zoomedOutFont = Number.parseFloat(elements.nodes.children[0].style.fontSize);
@@ -187,5 +208,5 @@ run("openFile(importedFile)").then(() => {
   storage.delete("open-map-library-v2");
   storage.set("open-map-v1", JSON.stringify({ nodes: [{ id: "old-node", x: 100, y: 100, text: "Legacy idea" }], edges: [] }));
   assert.equal(run("loadLibrary().maps[0].nodes[0].text"), "Legacy idea");
-  console.log("Smoke test passed: maps, duplication, history, links, colors, resize, pan, fit all, multi-selection, zoom, files, and migration.");
+  console.log("Smoke test passed: maps, duplication, history, links, colors, search, unlimited resize, pan, fit all, multi-selection, zoom, files, and migration.");
 }).catch(error => { console.error(error); process.exitCode = 1; });
