@@ -52,6 +52,24 @@ function blankMap(name = "My ideas") {
   };
 }
 
+function starterMap() {
+  const first = blankMap();
+  const centerId = first.nodes[0].id;
+  for (let index = 0; index < 5; index++) {
+    const angle = (-90 + index * 72) * Math.PI / 180;
+    const id = crypto.randomUUID();
+    first.nodes.push({
+      id,
+      x: Math.round(1200 + Math.cos(angle) * 280 - DEFAULT_WIDTH / 2),
+      y: Math.round(800 + Math.sin(angle) * 230 - DEFAULT_HEIGHT / 2),
+      width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT,
+      text: `Idea ${index + 1}`, groups: [],
+    });
+    first.edges.push({ id: crypto.randomUUID(), from: centerId, to: id });
+  }
+  return first;
+}
+
 function normalizeMap(raw, fallbackName = "Imported map") {
   if (!raw || !Array.isArray(raw.nodes) || !Array.isArray(raw.edges)) throw new Error("This file is not an Open Map map.");
   const nodes = raw.nodes.filter(node => node && typeof node.id === "string").map(node => ({
@@ -84,7 +102,7 @@ function loadLibrary() {
       return { activeMapId: oldMap.id, maps: [oldMap] };
     }
   } catch { /* Start fresh when saved data is unavailable. */ }
-  const first = blankMap();
+  const first = starterMap();
   return { activeMapId: first.id, maps: [first] };
 }
 

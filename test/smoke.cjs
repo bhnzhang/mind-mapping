@@ -63,8 +63,15 @@ vm.runInContext(source, context);
 const run = code => vm.runInContext(code, context);
 
 assert.equal(run("library.maps.length"), 1);
+assert.equal(run("map.nodes.length"), 6);
+assert.equal(run("map.edges.length"), 5);
+assert.equal(run("map.nodes[0].text"), "My ideas");
+assert.equal(run("map.nodes.slice(1).every((node, index) => node.text === `Idea ${index + 1}`)"), true);
+assert.equal(run("map.edges.every(edge => edge.from === map.nodes[0].id && map.nodes.some(node => node.id === edge.to))"), true);
 elements["new-map"].click();
 assert.equal(run("library.maps.length"), 2);
+assert.equal(run("map.nodes.length"), 1);
+assert.equal(run("map.edges.length"), 0);
 elements["rename-map"].click();
 assert.equal(run("map.name"), "Career ideas");
 elements.undo.click();
@@ -249,5 +256,5 @@ run("openFile(importedFile)").then(() => {
   assert.equal(run("library.maps.length"), 1);
   assert.notEqual(run("map.id"), lastId);
   assert.equal(run("map.nodes.length"), 1);
-  console.log("Smoke test passed: maps, duplication, deletion, history, links, colors, search, unlimited resize, crossing links, pan, fit all, multi-selection, zoom, files, and migration.");
+  console.log("Smoke test passed: starter map, maps, duplication, deletion, history, links, colors, search, unlimited resize, crossing links, pan, fit all, multi-selection, zoom, files, and migration.");
 }).catch(error => { console.error(error); process.exitCode = 1; });

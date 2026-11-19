@@ -6,6 +6,8 @@ A small, local mind mapping app. Create oval ideas, edit and resize them, drag t
 
 Open `index.html` in a browser. No installation or account is needed.
 
+On first use, the starting map has “My ideas” in the center with five connected “Idea” ovals. Existing saved maps load as before, and **New map** starts with a single oval.
+
 ## Use it
 
 - **Add an oval:** Double-click empty canvas space.
