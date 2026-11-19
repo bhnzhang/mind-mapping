@@ -36,7 +36,7 @@ class Element {
   remove() {}
 }
 
-const ids = ["workspace", "canvas-frame", "canvas", "nodes", "connections", "palette-colors", "map-list", "new-map", "rename-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
+const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "palette-colors", "map-list", "new-map", "rename-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
 const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
 const storage = new Map();
 const document = {
@@ -113,21 +113,46 @@ assert.ok(zoomedOutFont > 15);
 assert.ok(zoomedOutFont * 0.5 > 7.5 && zoomedOutFont * 0.5 < 15);
 run("renderNodes()");
 assert.equal(Number.parseFloat(elements.nodes.children[0].style.fontSize), zoomedOutFont);
-run("setZoom(2)");
+run("panX = 0; panY = 0; setZoom(2)");
 assert.equal(elements["zoom-label"].textContent, "200%");
 assert.equal(run("canvasPoint({ clientX: 300, clientY: 200 }).x"), 150);
-elements.workspace.scrollLeft = 500;
-elements.workspace.scrollTop = 400;
-const anchoredBefore = run("(workspace.scrollLeft + 200) / zoom");
+run("panX = 500; panY = 400; updateView()");
+const anchoredBefore = run("(200 - panX) / zoom");
 elements.workspace.listeners.wheel[0]({ clientX: 200, clientY: 100, deltaY: -120, deltaMode: 0, preventDefault() {} });
-const anchoredAfter = run("(workspace.scrollLeft + 200) / zoom");
+const anchoredAfter = run("(200 - panX) / zoom");
 assert.ok(Math.abs(anchoredAfter - anchoredBefore) < 0.001);
-const scrollBeforePan = elements.workspace.scrollLeft;
+const panBefore = run("panX");
 const background = { closest: () => null };
-elements.workspace.listeners.pointerdown[0]({ button: 0, pointerId: 3, clientX: 500, clientY: 300, target: background });
-elements.workspace.listeners.pointermove[0]({ pointerId: 3, clientX: 550, clientY: 300 });
-assert.equal(elements.workspace.scrollLeft, scrollBeforePan - 50);
-elements.workspace.listeners.pointerup[0]({ pointerId: 3 });
+elements.workspace.listeners.pointerdown[1]({ button: 0, pointerId: 3, clientX: 500, clientY: 300, target: background });
+elements.workspace.listeners.pointermove[1]({ pointerId: 3, clientX: 550, clientY: 300 });
+assert.equal(run("panX"), panBefore + 50);
+elements.workspace.listeners.pointerup[1]({ pointerId: 3 });
+run("panX = -1000000; panY = 1000000; updateView(false)");
+assert.equal(run("panX"), -1000000);
+assert.equal(run("panY"), 1000000);
+run("map.nodes[1].x = -5000; map.nodes[1].y = 8000; render()");
+assert.equal(run("normalizeMap(map).nodes[1].x"), -5000);
+elements["fit-all"].click();
+assert.ok(run("Math.min(...map.nodes.map(node => node.x * zoom + panX))") >= 0);
+assert.ok(run("Math.max(...map.nodes.map(node => (node.x + node.width) * zoom + panX))") <= elements.workspace.clientWidth);
+assert.ok(run("Math.min(...map.nodes.map(node => node.y * zoom + panY))") >= 0);
+assert.ok(run("Math.max(...map.nodes.map(node => (node.y + node.height) * zoom + panY))") <= elements.workspace.clientHeight);
+run("map.nodes[0].x = 100; map.nodes[0].y = 100; map.nodes[1].x = 300; map.nodes[1].y = 100; panX = 0; panY = 0; setZoom(1); render()");
+elements.workspace.listeners.pointerdown[0]({ shiftKey: true, button: 0, pointerId: 4, clientX: 50, clientY: 50,
+  target: background, preventDefault() {}, stopImmediatePropagation() {} });
+elements.workspace.listeners.pointermove[0]({ pointerId: 4, clientX: 500, clientY: 250 });
+elements.workspace.listeners.pointerup[0]({ type: "pointerup", pointerId: 4 });
+assert.equal(run("selectedIds.size"), 2);
+const sourceNode = elements.nodes.children[0];
+const sourceTarget = { tagName: "DIV", closest: () => null };
+context.sourceNode = sourceNode;
+context.sourceTarget = sourceTarget;
+run("setPaintTool(null)");
+run("onNodePointerDown({ button: 0, pointerId: 5, clientX: 177, clientY: 141, target: sourceTarget, currentTarget: sourceNode })");
+run("onNodePointerMove({ pointerId: 5, clientX: 217, clientY: 171, currentTarget: sourceNode })");
+run("onNodePointerUp({ type: 'pointerup', pointerId: 5, currentTarget: sourceNode })");
+assert.equal(run("map.nodes[0].x"), 140);
+assert.equal(run("map.nodes[1].x"), 340);
 
 assert.equal(JSON.parse(storage.get("open-map-library-v2")).maps.length, 2);
 run("saveFile()");
@@ -143,5 +168,5 @@ run("openFile(importedFile)").then(() => {
   storage.delete("open-map-library-v2");
   storage.set("open-map-v1", JSON.stringify({ nodes: [{ id: "old-node", x: 100, y: 100, text: "Legacy idea" }], edges: [] }));
   assert.equal(run("loadLibrary().maps[0].nodes[0].text"), "Legacy idea");
-  console.log("Smoke test passed: maps, history, links, color clearing, resize, pan, zoom, readable labels, files, and migration.");
+  console.log("Smoke test passed: maps, history, links, colors, resize, unlimited pan, fit all, multi-selection, zoom, files, and migration.");
 }).catch(error => { console.error(error); process.exitCode = 1; });

@@ -18,8 +18,8 @@ const COLORS = [
 ];
 
 const workspace = document.querySelector("#workspace");
-const canvasFrame = document.querySelector("#canvas-frame");
 const canvas = document.querySelector("#canvas");
+const selectionBox = document.querySelector("#selection-box");
 const nodesLayer = document.querySelector("#nodes");
 const connectionsLayer = document.querySelector("#connections");
 const paletteLayer = document.querySelector("#palette-colors");
@@ -32,6 +32,7 @@ const fileInput = document.querySelector("#file-input");
 const deleteLinkButton = document.querySelector("#delete-link");
 const undoButton = document.querySelector("#undo");
 const redoButton = document.querySelector("#redo");
+const fitAllButton = document.querySelector("#fit-all");
 const moveToolButton = document.querySelector("#move-tool");
 const clearColorsButton = document.querySelector("#clear-colors");
 const clearAllColorsButton = document.querySelector("#clear-all-colors");
@@ -50,17 +51,13 @@ function normalizeMap(raw, fallbackName = "Imported map") {
   if (!raw || !Array.isArray(raw.nodes) || !Array.isArray(raw.edges)) throw new Error("This file is not an Open Map map.");
   const nodes = raw.nodes.filter(node => node && typeof node.id === "string").map(node => ({
     id: node.id,
-    x: Number.isFinite(node.x) ? clamp(node.x, 0, CANVAS_WIDTH - MIN_WIDTH) : 1000,
-    y: Number.isFinite(node.y) ? clamp(node.y, 0, CANVAS_HEIGHT - MIN_HEIGHT) : 700,
+    x: Number.isFinite(node.x) ? node.x : 1000,
+    y: Number.isFinite(node.y) ? node.y : 700,
     width: Number.isFinite(node.width) ? clamp(node.width, MIN_WIDTH, 600) : DEFAULT_WIDTH,
     height: Number.isFinite(node.height) ? clamp(node.height, MIN_HEIGHT, 300) : DEFAULT_HEIGHT,
     text: typeof node.text === "string" ? node.text.slice(0, 100) : "Untitled",
     groups: Array.isArray(node.groups) ? [...new Set(node.groups.filter(name => COLORS.some(color => color.name === name)))] : [],
   }));
-  for (const node of nodes) {
-    node.x = Math.min(node.x, CANVAS_WIDTH - node.width);
-    node.y = Math.min(node.y, CANVAS_HEIGHT - node.height);
-  }
   const ids = new Set(nodes.map(node => node.id));
   const edges = raw.edges.filter(edge => edge && ids.has(edge.from) && ids.has(edge.to) && edge.from !== edge.to)
     .map(edge => ({ id: typeof edge.id === "string" ? edge.id : crypto.randomUUID(), from: edge.from, to: edge.to }));
@@ -92,7 +89,7 @@ let history = [JSON.stringify(map)];
 let historyIndex = 0;
 const histories = new Map();
 const views = new Map();
-let selectedId = null;
+let selectedIds = new Set();
 let selectedEdgeId = null;
 let paintColor = null;
 let editingId = null;
@@ -100,7 +97,10 @@ let drag = null;
 let resize = null;
 let connectionDrag = null;
 let panDrag = null;
+let marquee = null;
 let zoom = 1;
+let panX = 0;
+let panY = 0;
 
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(library)); }
@@ -119,13 +119,13 @@ function commit() {
 }
 
 function travelHistory(direction) {
-  if (drag || resize || connectionDrag || editingId) return;
+  if (drag || resize || connectionDrag || marquee || editingId) return;
   const next = historyIndex + direction;
   if (next < 0 || next >= history.length) return;
   historyIndex = next;
   map = JSON.parse(history[historyIndex]);
   library.maps[library.maps.findIndex(item => item.id === map.id)] = map;
-  if (!map.nodes.some(node => node.id === selectedId)) selectedId = null;
+  selectedIds = new Set([...selectedIds].filter(id => map.nodes.some(node => node.id === id)));
   if (!map.edges.some(edge => edge.id === selectedEdgeId)) selectedEdgeId = null;
   render();
   renderMapList();
@@ -140,29 +140,57 @@ function applyNodeTypography(element) {
   const reducedZoom = Math.min(zoom, 1);
   // The font gains size in map coordinates as the map shrinks, while its
   // on-screen size still changes gently with zoom.
-  element.style.fontSize = `${(15 * reducedZoom ** -0.65).toFixed(2)}px`;
+  element.style.fontSize = `${Math.min(36, 15 * reducedZoom ** -0.65).toFixed(2)}px`;
   element.style.padding = `${(15 * reducedZoom).toFixed(2)}px ${(20 * reducedZoom).toFixed(2)}px`;
   element.style.lineHeight = (1.05 + 0.2 * reducedZoom).toFixed(2);
 }
 
-function setZoom(next) {
-  zoom = clamp(next, 0.3, 3);
-  canvasFrame.style.width = `${CANVAS_WIDTH * zoom}px`;
-  canvasFrame.style.height = `${CANVAS_HEIGHT * zoom}px`;
-  canvas.style.transform = `scale(${zoom})`;
-  for (const element of nodesLayer.children) applyNodeTypography(element);
-  zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+function updateView(updateTypography = true) {
+  canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  workspace.style.backgroundSize = `${22 * zoom}px ${22 * zoom}px`;
+  workspace.style.backgroundPosition = `${panX}px ${panY}px`;
+  if (updateTypography) for (const element of nodesLayer.children) applyNodeTypography(element);
+  zoomLabel.textContent = zoom < 0.01 ? "<1%" : `${Math.round(zoom * 100)}%`;
 }
+
+function setZoom(next) { zoom = clamp(next, 0.000001, 3); updateView(); }
 
 function centerMap() {
   const target = map.nodes[0] ? centerOf(map.nodes[0]) : { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
-  workspace.scrollLeft = target.x * zoom - workspace.clientWidth / 2;
-  workspace.scrollTop = target.y * zoom - workspace.clientHeight / 2;
+  panX = workspace.clientWidth / 2 - target.x * zoom;
+  panY = workspace.clientHeight / 2 - target.y * zoom;
+  updateView();
 }
 
 function canvasPoint(event) {
-  const rect = canvas.getBoundingClientRect();
-  return { x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom };
+  const rect = workspace.getBoundingClientRect();
+  return { x: (event.clientX - rect.left - panX) / zoom, y: (event.clientY - rect.top - panY) / zoom };
+}
+
+function screenPoint(event) {
+  const rect = workspace.getBoundingClientRect();
+  return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+}
+
+function fitAll() {
+  if (!map.nodes.length) { setZoom(1); centerMap(); return; }
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const node of map.nodes) {
+    left = Math.min(left, node.x);
+    top = Math.min(top, node.y);
+    right = Math.max(right, node.x + node.width);
+    bottom = Math.max(bottom, node.y + node.height);
+  }
+  const padding = 64;
+  const width = Math.max(1, workspace.clientWidth - padding * 2);
+  const height = Math.max(1, workspace.clientHeight - padding * 2);
+  setZoom(Math.min(1, width / (right - left), height / (bottom - top)));
+  panX = workspace.clientWidth / 2 - (left + right) / 2 * zoom;
+  panY = workspace.clientHeight / 2 - (top + bottom) / 2 * zoom;
+  updateView();
 }
 
 function ellipseEndpoint(from, to) {
@@ -223,7 +251,7 @@ function renderEdges() {
       line.setAttribute("y2", end.y);
       group.append(line);
     }
-    group.addEventListener("pointerdown", event => { event.stopPropagation(); selectedId = null; selectedEdgeId = edge.id; updateControls(); });
+    group.addEventListener("pointerdown", event => { event.stopPropagation(); selectedIds.clear(); selectedEdgeId = edge.id; updateControls(); });
     connectionsLayer.append(group);
   }
 }
@@ -244,7 +272,7 @@ function renderMapList() {
 
 function updateControls() {
   for (const element of nodesLayer.children) {
-    element.classList.toggle("selected", element.dataset.id === selectedId);
+    element.classList.toggle("selected", selectedIds.has(element.dataset.id));
   }
   for (const element of connectionsLayer.children) {
     if (element.classList.contains("connection")) element.classList.toggle("selected", element.dataset.id === selectedEdgeId);
@@ -255,12 +283,14 @@ function updateControls() {
   moveToolButton.setAttribute("aria-pressed", String(paintColor === null));
   clearColorsButton.setAttribute("aria-pressed", String(paintColor === "clear"));
   for (const button of paletteLayer.children) button.setAttribute("aria-pressed", String(button.dataset.color === paintColor));
-  hint.textContent = selectedEdgeId ? "Connection selected. Press Delete or use Delete link."
+  hint.textContent = marquee ? "Drag a box around ovals to select them."
+    : selectedEdgeId ? "Connection selected. Press Delete or use Delete link."
     : connectionDrag ? "Release over another oval to connect."
     : resize ? "Drag the square to resize this oval."
+    : selectedIds.size > 1 ? `${selectedIds.size} ovals selected. Drag one to move them together.`
     : paintColor === "clear" ? "Click an oval to remove all its colors. Drag to move it."
     : paintColor ? `Click ovals to toggle ${paintColor.toLowerCase()}. Drag to move them.`
-    : "Drag empty space to pan. Scroll to zoom. Double-click to add an oval.";
+    : "Drag to pan · Shift-drag to select ovals · Scroll to zoom";
 }
 
 function renderNodes() {
@@ -309,7 +339,7 @@ function renderNodes() {
 }
 
 function render() { renderNodes(); renderEdges(); }
-function selectNode(id) { selectedId = id; selectedEdgeId = null; updateControls(); }
+function selectNode(id) { selectedIds = new Set([id]); selectedEdgeId = null; updateControls(); }
 
 function addEdge(from, to) {
   if (!from || !to || from === to || map.edges.some(edge =>
@@ -338,16 +368,16 @@ function paintNode(id) {
   commit();
 }
 
-// Keep the dragged or resized oval in place; move neighbors that overlap its box.
-function spreadNeighbors(anchorId) {
-  const anchor = getNode(anchorId);
-  if (!anchor) return;
-  const queue = [anchor];
+// Keep dragged or resized ovals in place; move neighbors that overlap their boxes.
+function spreadNeighbors(anchorIds) {
+  const ids = Array.isArray(anchorIds) ? anchorIds : [anchorIds];
+  const anchors = new Set(ids);
+  const queue = ids.map(getNode).filter(Boolean);
   let steps = 0;
   while (queue.length && steps++ < 80) {
     const moving = queue.shift();
     for (const other of map.nodes) {
-      if (other.id === moving.id || other.id === anchorId) continue;
+      if (other.id === moving.id || anchors.has(other.id)) continue;
       const a = centerOf(moving);
       const b = centerOf(other);
       const overlapX = (moving.width + other.width) / 2 + SPACING - Math.abs(b.x - a.x);
@@ -357,8 +387,6 @@ function spreadNeighbors(anchorId) {
       const beforeY = other.y;
       if (overlapX < overlapY) other.x += (b.x >= a.x ? 1 : -1) * overlapX;
       else other.y += (b.y >= a.y ? 1 : -1) * overlapY;
-      other.x = clamp(other.x, 0, CANVAS_WIDTH - other.width);
-      other.y = clamp(other.y, 0, CANVAS_HEIGHT - other.height);
       if (other.x === beforeX && other.y === beforeY) continue;
       const element = nodesLayer.querySelector(`[data-id="${other.id}"]`);
       if (element) { element.style.left = `${other.x}px`; element.style.top = `${other.y}px`; }
@@ -368,7 +396,7 @@ function spreadNeighbors(anchorId) {
 }
 
 function onNodeHover(event) {
-  if (drag || resize || connectionDrag || editingId || event.target.closest(".resize-handle")) return;
+  if (drag || resize || connectionDrag || marquee || editingId || event.target.closest(".resize-handle")) return;
   const node = getNode(event.currentTarget.dataset.id);
   event.currentTarget.classList.toggle("edge-ready", isNearEdge(node, canvasPoint(event)));
 }
@@ -378,7 +406,9 @@ function onNodePointerDown(event) {
   const element = event.currentTarget;
   const node = getNode(element.dataset.id);
   const point = canvasPoint(event);
-  drag = { id: node.id, pointerId: event.pointerId, startX: point.x, startY: point.y, nodeX: node.x, nodeY: node.y, moved: false, edgeCandidate: isNearEdge(node, point) };
+  if (!selectedIds.has(node.id)) selectNode(node.id);
+  const positions = [...selectedIds].map(id => { const item = getNode(id); return { id, x: item.x, y: item.y }; });
+  drag = { id: node.id, pointerId: event.pointerId, startX: point.x, startY: point.y, positions, moved: false, edgeCandidate: isNearEdge(node, point) };
   element.setPointerCapture(event.pointerId);
   element.addEventListener("pointermove", onNodePointerMove);
   element.addEventListener("pointerup", onNodePointerUp);
@@ -403,14 +433,16 @@ function onNodePointerMove(event) {
     return;
   }
   drag.moved = true;
-  const node = getNode(drag.id);
-  node.x = clamp(drag.nodeX + dx, 0, CANVAS_WIDTH - node.width);
-  node.y = clamp(drag.nodeY + dy, 0, CANVAS_HEIGHT - node.height);
+  for (const position of drag.positions) {
+    const node = getNode(position.id);
+    node.x = position.x + dx;
+    node.y = position.y + dy;
+    const item = nodesLayer.querySelector(`[data-id="${node.id}"]`);
+    if (item) { item.style.left = `${node.x}px`; item.style.top = `${node.y}px`; }
+  }
   const element = event.currentTarget;
   element.classList.add("dragging");
-  element.style.left = `${node.x}px`;
-  element.style.top = `${node.y}px`;
-  spreadNeighbors(node.id);
+  spreadNeighbors(drag.positions.map(position => position.id));
   renderEdges();
 }
 
@@ -505,10 +537,10 @@ function moveResize(event) {
   const dx = point.x - resize.startX;
   const dy = point.y - resize.startY;
   let { left, right, top, bottom } = resize;
-  if (resize.corner.includes("w")) left = clamp(left + dx, Math.max(0, right - 600), right - MIN_WIDTH);
-  else right = clamp(right + dx, left + MIN_WIDTH, Math.min(CANVAS_WIDTH, left + 600));
-  if (resize.corner.includes("n")) top = clamp(top + dy, Math.max(0, bottom - 300), bottom - MIN_HEIGHT);
-  else bottom = clamp(bottom + dy, top + MIN_HEIGHT, Math.min(CANVAS_HEIGHT, top + 300));
+  if (resize.corner.includes("w")) left = clamp(left + dx, right - 600, right - MIN_WIDTH);
+  else right = clamp(right + dx, left + MIN_WIDTH, left + 600);
+  if (resize.corner.includes("n")) top = clamp(top + dy, bottom - 300, bottom - MIN_HEIGHT);
+  else bottom = clamp(bottom + dy, top + MIN_HEIGHT, top + 300);
   node.x = left;
   node.y = top;
   node.width = right - left;
@@ -567,8 +599,8 @@ function startEditing(id) {
 function addNode(x, y) {
   const node = {
     id: crypto.randomUUID(),
-    x: clamp(Math.round(x - DEFAULT_WIDTH / 2), 0, CANVAS_WIDTH - DEFAULT_WIDTH),
-    y: clamp(Math.round(y - DEFAULT_HEIGHT / 2), 0, CANVAS_HEIGHT - DEFAULT_HEIGHT),
+    x: Math.round(x - DEFAULT_WIDTH / 2),
+    y: Math.round(y - DEFAULT_HEIGHT / 2),
     width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT, text: "New idea", groups: [],
   };
   map.nodes.push(node);
@@ -590,16 +622,16 @@ for (const color of COLORS) {
 }
 
 function switchMap(id) {
-  if (id === library.activeMapId || drag || resize || connectionDrag || panDrag) return;
+  if (id === library.activeMapId || drag || resize || connectionDrag || panDrag || marquee) return;
   if (editingId) document.activeElement?.blur();
   histories.set(map.id, { entries: history, index: historyIndex });
-  views.set(map.id, { zoom, scrollLeft: workspace.scrollLeft, scrollTop: workspace.scrollTop });
+  views.set(map.id, { zoom, panX, panY });
   library.activeMapId = id;
   map = library.maps.find(item => item.id === id);
   const previous = histories.get(id);
   history = previous?.entries || [JSON.stringify(map)];
   historyIndex = previous?.index ?? 0;
-  selectedId = null;
+  selectedIds.clear();
   selectedEdgeId = null;
   render();
   renderMapList();
@@ -607,7 +639,7 @@ function switchMap(id) {
   requestAnimationFrame(() => {
     const view = views.get(id);
     setZoom(view?.zoom ?? 1);
-    if (view) { workspace.scrollLeft = view.scrollLeft; workspace.scrollTop = view.scrollTop; }
+    if (view) { panX = view.panX; panY = view.panY; updateView(); }
     else centerMap();
   });
 }
@@ -626,10 +658,10 @@ function deleteSelected() {
     selectedEdgeId = null;
     renderEdges();
     commit();
-  } else if (selectedId) {
-    map.nodes = map.nodes.filter(node => node.id !== selectedId);
-    map.edges = map.edges.filter(edge => edge.from !== selectedId && edge.to !== selectedId);
-    selectedId = null;
+  } else if (selectedIds.size) {
+    map.nodes = map.nodes.filter(node => !selectedIds.has(node.id));
+    map.edges = map.edges.filter(edge => !selectedIds.has(edge.from) && !selectedIds.has(edge.to));
+    selectedIds.clear();
     render();
     commit();
   }
@@ -677,6 +709,7 @@ fileInput.addEventListener("change", async () => {
 deleteLinkButton.addEventListener("click", deleteSelected);
 undoButton.addEventListener("click", () => travelHistory(-1));
 redoButton.addEventListener("click", () => travelHistory(1));
+fitAllButton.addEventListener("click", fitAll);
 moveToolButton.addEventListener("click", () => setPaintTool(null));
 clearColorsButton.addEventListener("click", () => setPaintTool("clear"));
 clearAllColorsButton.addEventListener("click", () => {
@@ -688,22 +721,79 @@ clearAllColorsButton.addEventListener("click", () => {
   commit();
 });
 
-canvas.addEventListener("dblclick", event => {
-  if (event.target.closest(".node, .connection")) return;
+workspace.addEventListener("dblclick", event => {
+  if (event.shiftKey || event.target.closest(".node, .connection")) return;
   const point = canvasPoint(event);
   addNode(point.x, point.y);
 });
-canvas.addEventListener("pointerdown", event => {
-  if (event.target.closest(".node")) return;
-  selectedId = null;
+workspace.addEventListener("pointerdown", event => {
+  if (!event.shiftKey || event.button !== 0 || editingId || event.target.closest(".resize-handle, input")) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const point = screenPoint(event);
+  marquee = {
+    pointerId: event.pointerId, startX: point.x, startY: point.y,
+    baseIds: new Set(selectedIds), clickedId: event.target.closest(".node")?.dataset.id || null,
+    moved: false,
+  };
   selectedEdgeId = null;
+  selectionBox.hidden = false;
+  selectionBox.style.left = `${point.x}px`;
+  selectionBox.style.top = `${point.y}px`;
+  selectionBox.style.width = "0px";
+  selectionBox.style.height = "0px";
+  workspace.setPointerCapture(event.pointerId);
+  workspace.classList.add("selecting");
+  updateControls();
+}, true);
+workspace.addEventListener("pointermove", event => {
+  if (!marquee || event.pointerId !== marquee.pointerId) return;
+  const point = screenPoint(event);
+  if (!marquee.moved && Math.hypot(point.x - marquee.startX, point.y - marquee.startY) < 4) return;
+  marquee.moved = true;
+  const left = Math.min(marquee.startX, point.x);
+  const top = Math.min(marquee.startY, point.y);
+  const right = Math.max(marquee.startX, point.x);
+  const bottom = Math.max(marquee.startY, point.y);
+  selectionBox.style.left = `${left}px`;
+  selectionBox.style.top = `${top}px`;
+  selectionBox.style.width = `${right - left}px`;
+  selectionBox.style.height = `${bottom - top}px`;
+  const worldLeft = (left - panX) / zoom;
+  const worldTop = (top - panY) / zoom;
+  const worldRight = (right - panX) / zoom;
+  const worldBottom = (bottom - panY) / zoom;
+  selectedIds = new Set(marquee.baseIds);
+  for (const node of map.nodes) {
+    if (node.x < worldRight && node.x + node.width > worldLeft && node.y < worldBottom && node.y + node.height > worldTop) selectedIds.add(node.id);
+  }
   updateControls();
 });
+function endMarquee(event) {
+  if (!marquee || event.pointerId !== marquee.pointerId) return;
+  if (event.type === "pointercancel") selectedIds = new Set(marquee.baseIds);
+  else if (!marquee.moved && marquee.clickedId) {
+    selectedIds = new Set(marquee.baseIds);
+    if (selectedIds.has(marquee.clickedId)) selectedIds.delete(marquee.clickedId);
+    else selectedIds.add(marquee.clickedId);
+  }
+  marquee = null;
+  selectionBox.hidden = true;
+  workspace.classList.remove("selecting");
+  updateControls();
+}
+workspace.addEventListener("pointerup", endMarquee);
+workspace.addEventListener("pointercancel", endMarquee);
+window.addEventListener("pointerup", endMarquee);
+window.addEventListener("pointercancel", endMarquee);
 workspace.addEventListener("pointerdown", event => {
-  if (event.button !== 0 || event.target.closest(".node, .connection")) return;
+  if (event.button !== 0 || event.shiftKey || event.target.closest(".node, .connection")) return;
+  selectedIds.clear();
+  selectedEdgeId = null;
+  updateControls();
   panDrag = {
     pointerId: event.pointerId, x: event.clientX, y: event.clientY,
-    scrollLeft: workspace.scrollLeft, scrollTop: workspace.scrollTop, moved: false,
+    panX, panY, moved: false,
   };
 });
 workspace.addEventListener("pointermove", event => {
@@ -716,8 +806,9 @@ workspace.addEventListener("pointermove", event => {
     workspace.setPointerCapture(event.pointerId);
     workspace.classList.add("panning");
   }
-  workspace.scrollLeft = panDrag.scrollLeft - dx;
-  workspace.scrollTop = panDrag.scrollTop - dy;
+  panX = panDrag.panX + dx;
+  panY = panDrag.panY + dy;
+  updateView(false);
 });
 function endPan(event) {
   if (!panDrag || event.pointerId !== panDrag.pointerId) return;
@@ -733,12 +824,13 @@ workspace.addEventListener("wheel", event => {
   const rect = workspace.getBoundingClientRect();
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
-  const worldX = (workspace.scrollLeft + x) / zoom;
-  const worldY = (workspace.scrollTop + y) / zoom;
+  const worldX = (x - panX) / zoom;
+  const worldY = (y - panY) / zoom;
   const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? workspace.clientHeight : 1);
   setZoom(zoom * Math.exp(-delta * 0.0015));
-  workspace.scrollLeft = worldX * zoom - x;
-  workspace.scrollTop = worldY * zoom - y;
+  panX = x - worldX * zoom;
+  panY = y - worldY * zoom;
+  updateView(false);
 }, { passive: false });
 document.addEventListener("keydown", event => {
   if (event.ctrlKey || event.metaKey) {
@@ -747,7 +839,7 @@ document.addEventListener("keydown", event => {
     if (key === "y") { event.preventDefault(); travelHistory(1); return; }
   }
   if (event.key === "Escape") setPaintTool(null);
-  if ((event.key === "Delete" || event.key === "Backspace") && (selectedId || selectedEdgeId) && !editingId) {
+  if ((event.key === "Delete" || event.key === "Backspace") && (selectedIds.size || selectedEdgeId) && !editingId) {
     event.preventDefault();
     deleteSelected();
   }

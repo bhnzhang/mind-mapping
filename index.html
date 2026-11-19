@@ -14,6 +14,7 @@
         <div class="actions">
           <button id="undo" type="button" disabled title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
           <button id="redo" type="button" disabled title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+          <button id="fit-all" type="button" title="Fit all ovals on screen" aria-label="Fit all">⛶</button>
         </div>
         <span class="saved-note">Maps save automatically in this browser</span>
       </header>
@@ -41,17 +42,16 @@
           </section>
         </aside>
         <div class="workspace" id="workspace" aria-label="Mind map canvas">
-          <div class="canvas-frame" id="canvas-frame">
-            <div class="canvas" id="canvas">
-              <svg class="connections" id="connections" width="2400" height="1600" aria-hidden="true"></svg>
-              <div id="nodes"></div>
-            </div>
+          <div class="canvas" id="canvas">
+            <svg class="connections" id="connections" width="2400" height="1600" aria-hidden="true"></svg>
+            <div id="nodes"></div>
           </div>
+          <div class="selection-box" id="selection-box" hidden></div>
         </div>
       </div>
 
       <footer class="hintbar">
-        <span id="hint">Drag empty space to pan. Scroll to zoom. Double-click to add an oval.</span>
+        <span id="hint">Drag to pan · Shift-drag to select ovals · Scroll to zoom</span>
         <div class="footer-right"><span id="zoom-label">100%</span><span>Double-click to edit · Drag corner squares to resize</span><button id="delete-link" type="button" hidden>Delete link</button></div>
       </footer>
     </div>

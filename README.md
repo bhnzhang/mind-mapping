@@ -11,8 +11,10 @@ Open `index.html` in a browser. No installation or account is needed.
 - **Add an oval:** Double-click empty canvas space.
 - **Edit text:** Double-click an oval, type, and press Enter. Press Esc to cancel.
 - **Move an oval:** Drag it. Connected lines follow it.
-- **Pan the map:** Drag empty canvas space.
+- **Pan the map:** Drag empty canvas space in any direction; panning has no edge limit.
+- **Select several ovals:** Hold Shift and drag a box around them. Shift-click an oval to add or remove it from the selection. Drag one selected oval to move the group, or press Delete to remove the group.
 - **Zoom:** Scroll the mouse wheel over the canvas. Zoom centers on the pointer; the current level appears in the footer. Labels grow within their ovals as you zoom out so they remain easier to read.
+- **Fit all:** Click the ⛶ button beside Undo and Redo to center every oval and fit the map on screen.
 - **Connect ovals:** Drag from anywhere on an oval's outline to another oval. A click on the outline still selects or colors the oval.
 - **Delete a connection:** Click its line, then press Delete/Backspace or click **Delete link** in the footer.
 - **Resize an oval:** Select it and drag any of the four corner squares.
