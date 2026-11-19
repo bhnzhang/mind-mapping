@@ -22,6 +22,7 @@ const canvas = document.querySelector("#canvas");
 const selectionBox = document.querySelector("#selection-box");
 const nodesLayer = document.querySelector("#nodes");
 const connectionsLayer = document.querySelector("#connections");
+const crossingConnectionsLayer = document.querySelector("#crossing-connections");
 const paletteLayer = document.querySelector("#palette-colors");
 const mapList = document.querySelector("#map-list");
 const searchInput = document.querySelector("#search-nodes");
@@ -233,16 +234,32 @@ function nodeBackground(node) {
   return `linear-gradient(120deg, ${stops.join(", ")})`;
 }
 
+function lineCrossesNode(start, end, node) {
+  const center = centerOf(node);
+  const rx = node.width / 2;
+  const ry = node.height / 2;
+  const x = (start.x - center.x) / rx;
+  const y = (start.y - center.y) / ry;
+  const dx = (end.x - start.x) / rx;
+  const dy = (end.y - start.y) / ry;
+  const lengthSquared = dx * dx + dy * dy;
+  const t = lengthSquared ? clamp(-(x * dx + y * dy) / lengthSquared, 0, 1) : 0;
+  return (x + t * dx) ** 2 + (y + t * dy) ** 2 < 1;
+}
+
 function renderEdges() {
   connectionsLayer.replaceChildren();
+  crossingConnectionsLayer.replaceChildren();
   for (const edge of map.edges) {
     const a = getNode(edge.from);
     const b = getNode(edge.to);
     if (!a || !b) continue;
     const start = ellipseEndpoint(a, b);
     const end = ellipseEndpoint(b, a);
+    const crossing = map.nodes.some(node => node.id !== edge.from && node.id !== edge.to && lineCrossesNode(start, end, node));
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     group.classList.add("connection");
+    group.classList.toggle("crossing", crossing);
     group.classList.toggle("selected", edge.id === selectedEdgeId);
     group.dataset.id = edge.id;
     for (const className of ["connection-line", "connection-hit"]) {
@@ -255,7 +272,7 @@ function renderEdges() {
       group.append(line);
     }
     group.addEventListener("pointerdown", event => { event.stopPropagation(); selectedIds.clear(); selectedEdgeId = edge.id; updateControls(); });
-    connectionsLayer.append(group);
+    (crossing ? crossingConnectionsLayer : connectionsLayer).append(group);
   }
 }
 
@@ -277,7 +294,7 @@ function updateControls() {
   for (const element of nodesLayer.children) {
     element.classList.toggle("selected", selectedIds.has(element.dataset.id));
   }
-  for (const element of connectionsLayer.children) {
+  for (const element of [...connectionsLayer.children, ...crossingConnectionsLayer.children]) {
     if (element.classList.contains("connection")) element.classList.toggle("selected", element.dataset.id === selectedEdgeId);
   }
   deleteLinkButton.hidden = !selectedEdgeId;

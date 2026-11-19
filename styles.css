@@ -67,7 +67,9 @@ button { cursor: pointer; }
   transform-origin: 0 0; overflow: visible;
 }
 .connections { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.crossing-connections { z-index: 1; }
 .connections line { stroke: #666; stroke-width: 2.5; stroke-linecap: round; }
+.connections .connection.crossing .connection-line { stroke-dasharray: 8 7; }
 .connections .connection-hit { stroke: transparent; stroke-width: 20; pointer-events: stroke; cursor: pointer; }
 .connections .connection.selected .connection-line { stroke: #111; stroke-width: 4; }
 .connections .connection:hover .connection-line { stroke: #111; stroke-width: 3.5; }

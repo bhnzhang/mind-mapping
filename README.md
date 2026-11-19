@@ -16,6 +16,7 @@ Open `index.html` in a browser. No installation or account is needed.
 - **Zoom:** Scroll the mouse wheel over the canvas. Zoom centers on the pointer; the current level appears in the footer. Labels grow within their ovals as you zoom out so they remain easier to read.
 - **Fit all:** Click the ⛶ button beside Undo and Redo to center every oval and fit the map on screen.
 - **Connect ovals:** Drag from anywhere on an oval's outline to another oval. A click on the outline still selects or colors the oval.
+- **Crossing connections:** A connection that crosses an unrelated oval appears above the ovals as a dashed line. Other connections stay solid beneath them.
 - **Delete a connection:** Click its line, then press Delete/Backspace or click **Delete link** in the footer.
 - **Resize an oval:** Select it and drag any of the four corner squares. There is no maximum size.
 - **Search bubbles:** Type in the sidebar search field to highlight bubbles whose text contains your search, regardless of letter case. Other bubbles fade; clear the field to show them normally.

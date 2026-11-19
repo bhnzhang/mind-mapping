@@ -37,7 +37,7 @@ class Element {
   remove() {}
 }
 
-const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
+const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
 const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
 const storage = new Map();
 const document = {
@@ -208,5 +208,26 @@ run("openFile(importedFile)").then(() => {
   storage.delete("open-map-library-v2");
   storage.set("open-map-v1", JSON.stringify({ nodes: [{ id: "old-node", x: 100, y: 100, text: "Legacy idea" }], edges: [] }));
   assert.equal(run("loadLibrary().maps[0].nodes[0].text"), "Legacy idea");
-  console.log("Smoke test passed: maps, duplication, history, links, colors, search, unlimited resize, pan, fit all, multi-selection, zoom, files, and migration.");
+  run(`{
+    const savedNodes = map.nodes;
+    const savedEdges = map.edges;
+    map.nodes = [
+      { id: "a", x: 0, y: 0, width: 100, height: 60, text: "A", groups: [] },
+      { id: "b", x: 400, y: 0, width: 100, height: 60, text: "B", groups: [] },
+      { id: "c", x: 200, y: 0, width: 100, height: 60, text: "C", groups: [] },
+    ];
+    map.edges = [{ id: "a-b", from: "a", to: "b" }];
+    renderEdges();
+    globalThis.crossingTest = { savedNodes, savedEdges };
+  }`);
+  assert.equal(elements["crossing-connections"].children.length, 1);
+  assert.equal(elements.connections.children.length, 0);
+  assert.equal(elements["crossing-connections"].children[0].classList.contains("crossing"), true);
+  elements["crossing-connections"].children[0].listeners.pointerdown[0]({ stopPropagation() {} });
+  assert.equal(elements["crossing-connections"].children[0].classList.contains("selected"), true);
+  run("map.nodes[2].y = 200; renderEdges()");
+  assert.equal(elements["crossing-connections"].children.length, 0);
+  assert.equal(elements.connections.children.length, 1);
+  run("map.nodes = crossingTest.savedNodes; map.edges = crossingTest.savedEdges; selectedEdgeId = null; renderEdges()");
+  console.log("Smoke test passed: maps, duplication, history, links, colors, search, unlimited resize, crossing links, pan, fit all, multi-selection, zoom, files, and migration.");
 }).catch(error => { console.error(error); process.exitCode = 1; });
