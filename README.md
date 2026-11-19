@@ -23,7 +23,7 @@ Open `index.html` in a browser. No installation or account is needed.
 - **Color groups:** Pick a rainbow color in the sidebar, then click anywhere inside ovals to toggle that color. An oval can belong to several groups. **Erase colors** removes the colors from ovals you click. **Clear all colors** removes every oval's colors on the current map in one undoable step.
 - **Undo or redo:** Use the toolbar buttons, Ctrl+Z/Ctrl+Shift+Z, or Ctrl+Y.
 - **Delete an oval:** Select it and press Delete/Backspace.
-- **Multiple maps:** Create and switch maps in the sidebar. **Duplicate map** makes an independent copy of the active map and opens it. Rename a map with **Rename map**, or double-click its name in the list.
+- **Multiple maps:** Create and switch maps in the sidebar. **Duplicate map** makes an independent copy of the active map and opens it. Rename a map with **Rename map**, or double-click its name in the list. **Delete current map** removes it after confirmation; deleting the last map creates a fresh blank map.
 - **Save or open a file:** Use **Save file** to download the current map as `.openmap.json`. **Open file** imports a saved map as a new map in your sidebar.
 
 The default oval style is gray with a black outline. Color groups are optional.

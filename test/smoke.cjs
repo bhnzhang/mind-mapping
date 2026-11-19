@@ -37,9 +37,10 @@ class Element {
   remove() {}
 }
 
-const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
+const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
 const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
 const storage = new Map();
+let confirmResult = true;
 const document = {
   querySelector: selector => elements[selector.slice(1)],
   createElement: tag => new Element(tag),
@@ -51,7 +52,7 @@ const context = vm.createContext({
   document,
   localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) },
   crypto,
-  window: { prompt: () => "Career ideas", alert: message => { throw new Error(message); }, addEventListener() {} },
+  window: { prompt: () => "Career ideas", confirm: () => confirmResult, alert: message => { throw new Error(message); }, addEventListener() {} },
   requestAnimationFrame: callback => callback(),
   setTimeout,
   URL,
@@ -229,5 +230,24 @@ run("openFile(importedFile)").then(() => {
   assert.equal(elements["crossing-connections"].children.length, 0);
   assert.equal(elements.connections.children.length, 1);
   run("map.nodes = crossingTest.savedNodes; map.edges = crossingTest.savedEdges; selectedEdgeId = null; renderEdges()");
-  console.log("Smoke test passed: maps, duplication, history, links, colors, search, unlimited resize, crossing links, pan, fit all, multi-selection, zoom, files, and migration.");
+  const mapCount = run("library.maps.length");
+  const deletedId = run("map.id");
+  context.deletedId = deletedId;
+  confirmResult = false;
+  elements["delete-map"].click();
+  assert.equal(run("library.maps.length"), mapCount);
+  confirmResult = true;
+  elements["delete-map"].click();
+  assert.equal(run("library.maps.length"), mapCount - 1);
+  assert.notEqual(run("map.id"), deletedId);
+  assert.equal(run("library.maps.some(item => item.id === globalThis.deletedId)"), false);
+  assert.equal(JSON.parse(storage.get("open-map-library-v2")).maps.length, mapCount - 1);
+  assert.equal(run("histories.has(globalThis.deletedId)"), false);
+  while (run("library.maps.length") > 1) elements["delete-map"].click();
+  const lastId = run("map.id");
+  elements["delete-map"].click();
+  assert.equal(run("library.maps.length"), 1);
+  assert.notEqual(run("map.id"), lastId);
+  assert.equal(run("map.nodes.length"), 1);
+  console.log("Smoke test passed: maps, duplication, deletion, history, links, colors, search, unlimited resize, crossing links, pan, fit all, multi-selection, zoom, files, and migration.");
 }).catch(error => { console.error(error); process.exitCode = 1; });

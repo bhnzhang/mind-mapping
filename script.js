@@ -30,6 +30,7 @@ const searchCount = document.querySelector("#search-count");
 const newMapButton = document.querySelector("#new-map");
 const duplicateMapButton = document.querySelector("#duplicate-map");
 const renameMapButton = document.querySelector("#rename-map");
+const deleteMapButton = document.querySelector("#delete-map");
 const saveFileButton = document.querySelector("#save-file");
 const openFileButton = document.querySelector("#open-file");
 const fileInput = document.querySelector("#file-input");
@@ -705,6 +706,20 @@ function duplicateMap() {
   switchMap(copy.id);
 }
 
+function deleteMap() {
+  if (drag || resize || connectionDrag || panDrag || marquee) return;
+  if (editingId) document.activeElement?.blur();
+  if (!window.confirm(`Delete "${map.name}"? This removes the map from this browser and cannot be undone.`)) return;
+  const deletedId = map.id;
+  const index = library.maps.findIndex(item => item.id === deletedId);
+  library.maps.splice(index, 1);
+  if (!library.maps.length) library.maps.push(blankMap());
+  const next = library.maps[Math.min(index, library.maps.length - 1)];
+  switchMap(next.id);
+  histories.delete(deletedId);
+  views.delete(deletedId);
+}
+
 function deleteSelected() {
   if (selectedEdgeId) {
     map.edges = map.edges.filter(edge => edge.id !== selectedEdgeId);
@@ -753,6 +768,7 @@ newMapButton.addEventListener("click", () => {
   switchMap(fresh.id);
 });
 duplicateMapButton.addEventListener("click", duplicateMap);
+deleteMapButton.addEventListener("click", deleteMap);
 searchInput.addEventListener("input", updateSearch);
 renameMapButton.addEventListener("click", renameMap);
 saveFileButton.addEventListener("click", saveFile);

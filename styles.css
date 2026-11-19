@@ -49,6 +49,8 @@ button { cursor: pointer; }
 .color-option { display: flex; align-items: center; gap: 10px; padding: 5px 9px; }
 .swatch { width: 18px; height: 18px; flex: none; border-radius: 50%; background: var(--swatch); border: 1px solid #0002; }
 .tool-option { padding: 5px 9px; }
+.palette .delete-map { color: #a12626; }
+.palette .delete-map:hover { background: #fff0f0; }
 .clear-all { margin-top: 10px; border-top: 1px solid #ddd !important; border-radius: 0 !important; }
 .workspace {
   position: relative; flex: 1; min-width: 0; overflow: hidden; background-color: #f7f6f2;
