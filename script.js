@@ -25,6 +25,7 @@ const connectionsLayer = document.querySelector("#connections");
 const paletteLayer = document.querySelector("#palette-colors");
 const mapList = document.querySelector("#map-list");
 const newMapButton = document.querySelector("#new-map");
+const duplicateMapButton = document.querySelector("#duplicate-map");
 const renameMapButton = document.querySelector("#rename-map");
 const saveFileButton = document.querySelector("#save-file");
 const openFileButton = document.querySelector("#open-file");
@@ -652,6 +653,25 @@ function renameMap() {
   commit();
 }
 
+function duplicateMap() {
+  if (drag || resize || connectionDrag || panDrag || marquee) return;
+  if (editingId) document.activeElement?.blur();
+  const original = JSON.parse(JSON.stringify(map));
+  const nodeIds = new Map(original.nodes.map(node => [node.id, crypto.randomUUID()]));
+  const baseName = `${original.name.slice(0, 75)} copy`;
+  let name = baseName;
+  let number = 2;
+  while (library.maps.some(item => item.name === name)) name = `${baseName.slice(0, 77)} ${number++}`;
+  const copy = {
+    ...original,
+    id: crypto.randomUUID(), name,
+    nodes: original.nodes.map(node => ({ ...node, id: nodeIds.get(node.id) })),
+    edges: original.edges.map(edge => ({ ...edge, id: crypto.randomUUID(), from: nodeIds.get(edge.from), to: nodeIds.get(edge.to) })),
+  };
+  library.maps.push(copy);
+  switchMap(copy.id);
+}
+
 function deleteSelected() {
   if (selectedEdgeId) {
     map.edges = map.edges.filter(edge => edge.id !== selectedEdgeId);
@@ -699,6 +719,7 @@ newMapButton.addEventListener("click", () => {
   save();
   switchMap(fresh.id);
 });
+duplicateMapButton.addEventListener("click", duplicateMap);
 renameMapButton.addEventListener("click", renameMap);
 saveFileButton.addEventListener("click", saveFile);
 openFileButton.addEventListener("click", () => fileInput.click());

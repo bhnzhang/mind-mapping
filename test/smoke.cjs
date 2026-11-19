@@ -36,7 +36,7 @@ class Element {
   remove() {}
 }
 
-const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "palette-colors", "map-list", "new-map", "rename-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
+const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "palette-colors", "map-list", "new-map", "duplicate-map", "rename-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
 const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
 const storage = new Map();
 const document = {
@@ -165,8 +165,27 @@ context.importedFile = {
 run("openFile(importedFile)").then(() => {
   assert.equal(run("library.maps.length"), 3);
   assert.equal(run("map.name"), "Career ideas");
+  const originalId = run("map.id");
+  const originalNodeId = run("map.nodes[0].id");
+  const originalNodeText = run("map.nodes[0].text");
+  const originalEdgeCount = run("map.edges.length");
+  const originalGroups = run("JSON.stringify(map.nodes[0].groups)");
+  elements["duplicate-map"].click();
+  assert.equal(run("library.maps.length"), 4);
+  assert.equal(run("map.name"), "Career ideas copy");
+  assert.notEqual(run("map.id"), originalId);
+  assert.notEqual(run("map.nodes[0].id"), originalNodeId);
+  assert.equal(run("map.edges.length"), originalEdgeCount);
+  assert.equal(run("JSON.stringify(map.nodes[0].groups)"), originalGroups);
+  assert.equal(run("map.edges.every(edge => map.nodes.some(node => node.id === edge.from) && map.nodes.some(node => node.id === edge.to))"), true);
+  run("map.nodes[0].text = 'Changed only in copy'; commit()");
+  context.originalId = originalId;
+  run("switchMap(originalId)");
+  assert.equal(run("map.nodes[0].text"), originalNodeText);
+  elements["duplicate-map"].click();
+  assert.equal(run("map.name"), "Career ideas copy 2");
   storage.delete("open-map-library-v2");
   storage.set("open-map-v1", JSON.stringify({ nodes: [{ id: "old-node", x: 100, y: 100, text: "Legacy idea" }], edges: [] }));
   assert.equal(run("loadLibrary().maps[0].nodes[0].text"), "Legacy idea");
-  console.log("Smoke test passed: maps, history, links, colors, resize, unlimited pan, fit all, multi-selection, zoom, files, and migration.");
+  console.log("Smoke test passed: maps, duplication, history, links, colors, resize, pan, fit all, multi-selection, zoom, files, and migration.");
 }).catch(error => { console.error(error); process.exitCode = 1; });
