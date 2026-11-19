@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f6f2" />
+    <title>Open Map</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="toolbar">
+        <div class="brand"><span class="brand-mark">✳</span><span>Open Map</span></div>
+        <div class="actions">
+          <button id="undo" type="button" disabled title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+          <button id="redo" type="button" disabled title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+        </div>
+        <span class="saved-note">Maps save automatically in this browser</span>
+      </header>
+
+      <div class="main">
+        <aside class="palette" aria-label="Color groups">
+          <section class="sidebar-section">
+            <div class="palette-title">Maps</div>
+            <div class="map-list" id="map-list"></div>
+            <button class="tool-option" id="new-map" type="button">+ New map</button>
+            <button class="tool-option" id="rename-map" type="button">Rename map</button>
+            <div class="file-actions">
+              <button class="tool-option" id="save-file" type="button">↓ Save file</button>
+              <button class="tool-option" id="open-file" type="button">↑ Open file</button>
+            </div>
+            <input id="file-input" type="file" accept=".json,.openmap,application/json" hidden />
+          </section>
+          <section class="sidebar-section">
+          <div class="palette-title">Color groups</div>
+          <div class="palette-help">Pick a color, then click ovals to add or remove them from that group.</div>
+          <button class="tool-option active" id="move-tool" type="button" aria-pressed="true">↖ Move & select</button>
+          <div class="palette-colors" id="palette-colors"></div>
+          <button class="tool-option" id="clear-colors" type="button" aria-pressed="false">◌ Erase colors</button>
+          <button class="tool-option clear-all" id="clear-all-colors" type="button">Clear all colors</button>
+          </section>
+        </aside>
+        <div class="workspace" id="workspace" aria-label="Mind map canvas">
+          <div class="canvas-frame" id="canvas-frame">
+            <div class="canvas" id="canvas">
+              <svg class="connections" id="connections" width="2400" height="1600" aria-hidden="true"></svg>
+              <div id="nodes"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="hintbar">
+        <span id="hint">Drag empty space to pan. Scroll to zoom. Double-click to add an oval.</span>
+        <div class="footer-right"><span id="zoom-label">100%</span><span>Double-click to edit · Drag corner squares to resize</span><button id="delete-link" type="button" hidden>Delete link</button></div>
+      </footer>
+    </div>
+    <script src="script.js" defer></script>
+  </body>
+</html>
