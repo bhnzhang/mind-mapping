@@ -8,21 +8,24 @@ const DEFAULT_HEIGHT = 82;
 const MIN_WIDTH = 100;
 const MIN_HEIGHT = 60;
 const SPACING = 20;
+const CLIPBOARD_TYPE = "application/x-open-map-bubbles";
 const COLORS = [
-  { name: "Red", swatch: "#e5484d", fill: "#ffd7d9" },
-  { name: "Orange", swatch: "#ef8b2c", fill: "#ffe2c4" },
-  { name: "Yellow", swatch: "#e3bd16", fill: "#fff1a8" },
-  { name: "Green", swatch: "#35a76a", fill: "#c9f2d9" },
-  { name: "Blue", swatch: "#3d87df", fill: "#cfe5ff" },
-  { name: "Indigo", swatch: "#5958c8", fill: "#dcdcff" },
-  { name: "Violet", swatch: "#a65acb", fill: "#efd6fa" },
+  { name: "Red", swatch: "#e5484d", fill: "#ffd7d9", darkFill: "#67313b" },
+  { name: "Orange", swatch: "#ef8b2c", fill: "#ffe2c4", darkFill: "#684426" },
+  { name: "Yellow", swatch: "#e3bd16", fill: "#fff1a8", darkFill: "#5b5125" },
+  { name: "Green", swatch: "#35a76a", fill: "#c9f2d9", darkFill: "#285b46" },
+  { name: "Blue", swatch: "#3d87df", fill: "#cfe5ff", darkFill: "#2c4e73" },
+  { name: "Indigo", swatch: "#5958c8", fill: "#dcdcff", darkFill: "#404274" },
+  { name: "Violet", swatch: "#a65acb", fill: "#efd6fa", darkFill: "#593968" },
 ];
 
 const workspace = document.querySelector("#workspace");
 const canvas = document.querySelector("#canvas");
 const selectionBox = document.querySelector("#selection-box");
-const degreesPopover = document.querySelector("#degrees-popover");
-const degreesSelect = document.querySelector("#degrees-select");
+const degreesControl = document.querySelector("#degrees-control");
+const degreesValue = document.querySelector("#degrees-value");
+const degreesUp = document.querySelector("#degrees-up");
+const degreesDown = document.querySelector("#degrees-down");
 const nodesLayer = document.querySelector("#nodes");
 const connectionsLayer = document.querySelector("#connections");
 const crossingConnectionsLayer = document.querySelector("#crossing-connections");
@@ -132,6 +135,8 @@ let zoom = 1;
 let panX = 0;
 let panY = 0;
 let theme = "light";
+let lastPointer = null;
+let copiedBubbles = null;
 try { if (localStorage.getItem(THEME_KEY) === "dark") theme = "dark"; }
 catch { /* Use the default theme when storage is unavailable. */ }
 
@@ -145,6 +150,7 @@ function applyTheme() {
 function toggleTheme() {
   theme = theme === "dark" ? "light" : "dark";
   applyTheme();
+  for (const element of nodesLayer.children) element.style.background = nodeBackground(getNode(element.dataset.id));
   try { localStorage.setItem(THEME_KEY, theme); }
   catch { /* The theme still works for this session. */ }
 }
@@ -205,7 +211,6 @@ function updateView(updateTypography = true) {
   workspace.style.backgroundPosition = `${panX}px ${panY}px`;
   if (updateTypography) for (const element of nodesLayer.children) applyNodeTypography(element);
   zoomLabel.textContent = zoom < 0.01 ? "<1%" : `${Math.round(zoom * 100)}%`;
-  positionDegreesPopover();
 }
 
 function setZoom(next) { zoom = clamp(next, 0.000001, 3); updateView(); }
@@ -277,7 +282,10 @@ function isNearEdge(node, point) {
 }
 
 function nodeBackground(node) {
-  const fills = node.groups.map(name => COLORS.find(color => color.name === name)?.fill).filter(Boolean);
+  const fills = node.groups.map(name => {
+    const color = COLORS.find(item => item.name === name);
+    return theme === "dark" ? color?.darkFill : color?.fill;
+  }).filter(Boolean);
   if (!fills.length) return "var(--node-bg)";
   if (fills.length === 1) return fills[0];
   const step = 100 / fills.length;
@@ -362,36 +370,15 @@ function connectedWithinDegrees(startId, depth) {
   return visited;
 }
 
-function positionDegreesPopover() {
-  const node = degreeAnchorId && getNode(degreeAnchorId);
-  if (!node || selectedIds.size !== 1 || paintColor || selectedEdgeId || connectionDrag) {
-    degreesPopover.hidden = true;
-    return;
-  }
-  const left = node.x * zoom + panX;
-  const top = node.y * zoom + panY;
-  const right = left + node.width * zoom;
-  const bottom = top + node.height * zoom;
-  if (right < 0 || bottom < 0 || left > workspace.clientWidth || top > workspace.clientHeight) {
-    degreesPopover.hidden = true;
-    return;
-  }
-  const width = 186;
-  const height = 78;
-  let x = right + 14;
-  if (x + width + 8 > workspace.clientWidth) x = left - width - 14;
-  degreesPopover.style.left = `${clamp(x, 8, Math.max(8, workspace.clientWidth - width - 8))}px`;
-  degreesPopover.style.top = `${clamp(top, 8, Math.max(8, workspace.clientHeight - height - 8))}px`;
-  degreesPopover.hidden = false;
-}
-
 function updateControls() {
   const singleId = selectedIds.size === 1 && !selectedEdgeId && !paintColor ? [...selectedIds][0] : null;
   if (singleId !== degreeAnchorId) {
     degreeAnchorId = singleId;
     degreeDepth = 0;
-    degreesSelect.value = "0";
   }
+  degreesValue.textContent = String(degreeDepth);
+  degreesUp.disabled = !singleId || degreeDepth >= 10;
+  degreesDown.disabled = !singleId || degreeDepth <= 0;
   const highlighted = singleId ? connectedWithinDegrees(singleId, degreeDepth) : new Set();
   for (const element of nodesLayer.children) {
     element.classList.toggle("selected", selectedIds.has(element.dataset.id));
@@ -414,7 +401,6 @@ function updateControls() {
     : paintColor === "clear" ? "Click an oval to remove all its colors. Drag to move it."
     : paintColor ? `Click ovals to toggle ${paintColor.toLowerCase()}. Drag to move them.`
     : "Drag to pan · Shift-drag to select ovals · Scroll to zoom";
-  positionDegreesPopover();
 }
 
 function updateSearch() {
@@ -584,7 +570,6 @@ function onNodePointerMove(event) {
   element.classList.add("dragging");
   spreadNeighbors(drag.positions.map(position => position.id));
   renderEdges();
-  positionDegreesPopover();
 }
 
 function onNodePointerUp(event) {
@@ -699,7 +684,6 @@ function moveResize(event) {
   }
   spreadNeighbors(resize.nodes.map(node => node.id));
   renderEdges();
-  positionDegreesPopover();
 }
 
 function endResize(event) {
@@ -849,6 +833,62 @@ function deleteSelected() {
   updateControls();
 }
 
+function isEditingText(event) {
+  return editingId || event.target?.closest?.("input, textarea, [contenteditable='true']");
+}
+
+function copySelected(event, cut = false) {
+  if (isEditingText(event) || !selectedIds.size || !event.clipboardData) return;
+  const nodes = map.nodes.filter(node => selectedIds.has(node.id));
+  const edges = map.edges.filter(edge => selectedIds.has(edge.from) && selectedIds.has(edge.to));
+  const payload = { format: "open-map-bubbles", version: 1, nodes, edges };
+  const plainText = nodes.map(node => node.text).join("\n");
+  try {
+    event.clipboardData.setData("text/plain", plainText);
+    try { event.clipboardData.setData(CLIPBOARD_TYPE, JSON.stringify(payload)); }
+    catch { /* Plain text and the in-page copy still support pasting. */ }
+  } catch { return; }
+  copiedBubbles = { payload: JSON.parse(JSON.stringify(payload)), plainText };
+  event.preventDefault();
+  if (cut) deleteSelected();
+}
+
+function pasteBubbles(event) {
+  if (isEditingText(event) || !event.clipboardData) return;
+  let payload;
+  try { payload = JSON.parse(event.clipboardData.getData(CLIPBOARD_TYPE)); }
+  catch { /* Use the in-page copy if the browser omits the custom clipboard type. */ }
+  if (!payload && copiedBubbles && event.clipboardData.getData("text/plain") === copiedBubbles.plainText) {
+    payload = copiedBubbles.payload;
+  }
+  if (payload?.format !== "open-map-bubbles" || payload.version !== 1) return;
+  let source;
+  try { source = normalizeMap(payload, "Clipboard"); }
+  catch { return; }
+  if (!source.nodes.length) return;
+  event.preventDefault();
+  const rect = workspace.getBoundingClientRect();
+  const pointer = lastPointer || { clientX: rect.left + workspace.clientWidth / 2, clientY: rect.top + workspace.clientHeight / 2 };
+  const point = canvasPoint(pointer);
+  const left = Math.min(...source.nodes.map(node => node.x));
+  const top = Math.min(...source.nodes.map(node => node.y));
+  const right = Math.max(...source.nodes.map(node => node.x + node.width));
+  const bottom = Math.max(...source.nodes.map(node => node.y + node.height));
+  const dx = point.x - (left + right) / 2;
+  const dy = point.y - (top + bottom) / 2;
+  const ids = new Map(source.nodes.map(node => [node.id, crypto.randomUUID()]));
+  const pastedNodes = source.nodes.map(node => ({ ...node, id: ids.get(node.id), x: node.x + dx, y: node.y + dy }));
+  const pastedEdges = source.edges.map(edge => ({ ...edge, id: crypto.randomUUID(), from: ids.get(edge.from), to: ids.get(edge.to) }));
+  map.nodes.push(...pastedNodes);
+  map.edges.push(...pastedEdges);
+  selectedIds = new Set(pastedNodes.map(node => node.id));
+  selectedEdgeId = null;
+  render();
+  spreadNeighbors([...selectedIds]);
+  renderEdges();
+  commit();
+}
+
 function saveFile() {
   const file = new Blob([JSON.stringify({ format: "open-map", version: 1, map }, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(file);
@@ -896,13 +936,16 @@ redoButton.addEventListener("click", () => travelHistory(1));
 fitAllButton.addEventListener("click", fitAll);
 themeButton.addEventListener("click", toggleTheme);
 moveToolButton.addEventListener("click", () => setPaintTool(null));
-degreesSelect.addEventListener("change", () => {
-  degreeDepth = clamp(Number(degreesSelect.value) || 0, 0, 10);
+degreesUp.addEventListener("click", () => {
+  degreeDepth = Math.min(10, degreeDepth + 1);
   updateControls();
 });
-degreesPopover.addEventListener("pointerdown", event => event.stopPropagation());
-degreesPopover.addEventListener("dblclick", event => event.stopPropagation());
-window.addEventListener("resize", positionDegreesPopover);
+degreesDown.addEventListener("click", () => {
+  degreeDepth = Math.max(0, degreeDepth - 1);
+  updateControls();
+});
+degreesControl.addEventListener("pointerdown", event => event.stopPropagation());
+degreesControl.addEventListener("dblclick", event => event.stopPropagation());
 clearColorsButton.addEventListener("click", () => setPaintTool("clear"));
 clearAllColorsButton.addEventListener("click", () => {
   if (editingId) document.activeElement?.blur();
@@ -919,7 +962,7 @@ workspace.addEventListener("dblclick", event => {
   addNode(point.x, point.y);
 });
 workspace.addEventListener("pointerdown", event => {
-  if (!event.shiftKey || event.button !== 0 || editingId || event.target.closest(".resize-handle, .degrees-popover, input")) return;
+  if (!event.shiftKey || event.button !== 0 || editingId || event.target.closest(".resize-handle, .degrees-control, input")) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   const point = screenPoint(event);
@@ -1024,6 +1067,7 @@ workspace.addEventListener("wheel", event => {
   panY = y - worldY * zoom;
   updateView(false);
 }, { passive: false });
+workspace.addEventListener("pointermove", event => { lastPointer = { clientX: event.clientX, clientY: event.clientY }; }, true);
 document.addEventListener("keydown", event => {
   if (event.ctrlKey || event.metaKey) {
     const key = event.key.toLowerCase();
@@ -1036,6 +1080,9 @@ document.addEventListener("keydown", event => {
     deleteSelected();
   }
 });
+document.addEventListener("copy", event => copySelected(event));
+document.addEventListener("cut", event => copySelected(event, true));
+document.addEventListener("paste", pasteBubbles);
 
 applyTheme();
 renderMapList();

@@ -37,7 +37,7 @@ class Element {
   remove() {}
 }
 
-const ids = ["workspace", "canvas", "selection-box", "degrees-popover", "degrees-select", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "theme-toggle", "theme-color", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
+const ids = ["workspace", "canvas", "selection-box", "degrees-control", "degrees-value", "degrees-up", "degrees-down", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "theme-toggle", "theme-color", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
 const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
 const storage = new Map();
 storage.set("open-map-theme", "dark");
@@ -48,7 +48,8 @@ const document = {
   createElement: tag => new Element(tag),
   createElementNS: (_namespace, tag) => new Element(tag),
   body: new Element("body"),
-  addEventListener() {},
+  listeners: {},
+  addEventListener(name, callback) { (this.listeners[name] ||= []).push(callback); },
 };
 const context = vm.createContext({
   document,
@@ -90,26 +91,25 @@ run(`{
 }`);
 const highlighted = () => elements.nodes.children.filter(node => node.classList.contains("degree-highlight")).map(node => node.dataset.id);
 assert.deepEqual(highlighted(), ["a"]);
-assert.equal(elements["degrees-popover"].hidden, false);
-elements["degrees-select"].value = "1";
-elements["degrees-select"].listeners.change[0]();
+assert.equal(elements["degrees-value"].textContent, "0");
+elements["degrees-up"].click();
 assert.deepEqual(highlighted(), ["a", "b"]);
-elements["degrees-select"].value = "2";
-elements["degrees-select"].listeners.change[0]();
+elements["degrees-up"].click();
 assert.deepEqual(highlighted(), ["a", "b", "c"]);
-elements["degrees-select"].value = "10";
-elements["degrees-select"].listeners.change[0]();
+for (let index = 0; index < 8; index++) elements["degrees-up"].click();
+assert.equal(elements["degrees-value"].textContent, "10");
+assert.equal(elements["degrees-up"].disabled, true);
 assert.deepEqual(highlighted(), ["a", "b", "c"]);
 run('selectNode("c")');
-assert.equal(elements["degrees-select"].value, "0");
+assert.equal(elements["degrees-value"].textContent, "0");
 assert.deepEqual(highlighted(), ["c"]);
 run('setPaintTool("Red")');
-assert.equal(elements["degrees-popover"].hidden, true);
+assert.equal(elements["degrees-up"].disabled, true);
 run('setPaintTool(null)');
 assert.deepEqual(highlighted(), ["c"]);
 run('selectedIds = new Set(["a", "c"]); updateControls()');
 assert.deepEqual(highlighted(), []);
-assert.equal(elements["degrees-popover"].hidden, true);
+assert.equal(elements["degrees-up"].disabled, true);
 run('map.nodes = originalGraph.nodes; map.edges = originalGraph.edges; selectedIds.clear(); render()');
 elements["new-map"].click();
 assert.equal(run("library.maps.length"), 2);
@@ -151,6 +151,12 @@ run(`{
 }`);
 assert.equal(run('map.nodes[0].groups.includes("Red")'), true);
 assert.equal(elements.nodes.children[0].classList.contains("colored"), true);
+assert.equal(elements.nodes.children[0].style.background, "#67313b");
+assert.match(run('nodeBackground({ groups: ["Red", "Blue"] })'), /#67313b.*#2c4e73/);
+elements["theme-toggle"].click();
+assert.equal(elements.nodes.children[0].style.background, "#ffd7d9");
+elements["theme-toggle"].click();
+assert.equal(elements.nodes.children[0].style.background, "#67313b");
 run('paintNode(map.nodes[1].id)');
 elements["clear-all-colors"].click();
 assert.equal(run('map.nodes.every(node => node.groups.length === 0)'), true);
@@ -253,6 +259,52 @@ assert.deepEqual(JSON.parse(run("JSON.stringify(map.nodes.map(({ x, y, width, he
 elements.redo.click();
 assert.equal(run("map.nodes[1].width"), beforeGroupResize[1].width + 36);
 
+const clipboard = new Map();
+const clipboardData = {
+  setData: (type, value) => clipboard.set(type, value),
+  getData: type => clipboard.get(type) || "",
+};
+const clipboardEvent = () => ({ clipboardData, target: null, prevented: false, preventDefault() { this.prevented = true; } });
+const copyEvent = clipboardEvent();
+document.listeners.copy[0](copyEvent);
+assert.equal(copyEvent.prevented, true);
+assert.match(clipboard.get("text/plain"), /Second/);
+assert.equal(JSON.parse(clipboard.get("application/x-open-map-bubbles")).edges.length, 1);
+elements.workspace.listeners.pointermove[2]({ clientX: 450, clientY: 350 });
+const pasteEvent = clipboardEvent();
+document.listeners.paste[0](pasteEvent);
+assert.equal(pasteEvent.prevented, true);
+assert.equal(run("map.nodes.length"), 4);
+assert.equal(run("map.edges.length"), 2);
+assert.equal(run("selectedIds.size"), 2);
+assert.equal(run("(Math.min(...map.nodes.slice(2).map(node => node.x)) + Math.max(...map.nodes.slice(2).map(node => node.x + node.width))) / 2"), 450);
+assert.equal(run("(Math.min(...map.nodes.slice(2).map(node => node.y)) + Math.max(...map.nodes.slice(2).map(node => node.y + node.height))) / 2"), 350);
+const nativePaste = clipboardEvent();
+nativePaste.target = { closest: () => ({}) };
+document.listeners.paste[0](nativePaste);
+assert.equal(nativePaste.prevented, false);
+assert.equal(run("map.nodes.length"), 4);
+elements.undo.click();
+assert.equal(run("map.nodes.length"), 2);
+run("selectedIds = new Set(map.nodes.map(node => node.id)); updateControls()");
+const cutEvent = clipboardEvent();
+document.listeners.cut[0](cutEvent);
+assert.equal(cutEvent.prevented, true);
+assert.equal(run("map.nodes.length"), 0);
+assert.equal(run("map.edges.length"), 0);
+elements.undo.click();
+assert.equal(run("map.nodes.length"), 2);
+assert.equal(run("map.edges.length"), 1);
+clipboard.delete("application/x-open-map-bubbles");
+run("panX = 100; panY = 50; setZoom(2)");
+elements.workspace.listeners.pointermove[2]({ clientX: 500, clientY: 300 });
+document.listeners.paste[0](clipboardEvent());
+assert.equal(run("map.nodes.length"), 4);
+assert.equal(run("(Math.min(...map.nodes.slice(2).map(node => node.x)) + Math.max(...map.nodes.slice(2).map(node => node.x + node.width))) / 2"), 200);
+assert.equal(run("(Math.min(...map.nodes.slice(2).map(node => node.y)) + Math.max(...map.nodes.slice(2).map(node => node.y + node.height))) / 2"), 125);
+elements.undo.click();
+run("panX = 0; panY = 0; setZoom(1)");
+
 assert.equal(JSON.parse(storage.get("open-map-library-v2")).maps.length, 2);
 run("saveFile()");
 assert.match(document.body.children.at(-1).download, /\.openmap\.json$/);
@@ -326,5 +378,5 @@ run("openFile(importedFile)").then(() => {
   assert.equal(run("library.maps.length"), 1);
   assert.notEqual(run("map.id"), lastId);
   assert.equal(run("map.nodes.length"), 1);
-  console.log("Smoke test passed: theme, starter map, maps, duplication, deletion, history, links, colors, search, unlimited resize, crossing links, pan, fit all, multi-selection, zoom, files, and migration.");
+  console.log("Smoke test passed: theme colors, degree control, clipboard, maps, history, links, search, resize, pan, selection, zoom, files, and migration.");
 }).catch(error => { console.error(error); process.exitCode = 1; });
