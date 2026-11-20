@@ -21,6 +21,8 @@ const COLORS = [
 const workspace = document.querySelector("#workspace");
 const canvas = document.querySelector("#canvas");
 const selectionBox = document.querySelector("#selection-box");
+const degreesPopover = document.querySelector("#degrees-popover");
+const degreesSelect = document.querySelector("#degrees-select");
 const nodesLayer = document.querySelector("#nodes");
 const connectionsLayer = document.querySelector("#connections");
 const crossingConnectionsLayer = document.querySelector("#crossing-connections");
@@ -116,6 +118,8 @@ let historyIndex = 0;
 const histories = new Map();
 const views = new Map();
 let selectedIds = new Set();
+let degreeAnchorId = null;
+let degreeDepth = 0;
 let selectedEdgeId = null;
 let paintColor = null;
 let editingId = null;
@@ -201,6 +205,7 @@ function updateView(updateTypography = true) {
   workspace.style.backgroundPosition = `${panX}px ${panY}px`;
   if (updateTypography) for (const element of nodesLayer.children) applyNodeTypography(element);
   zoomLabel.textContent = zoom < 0.01 ? "<1%" : `${Math.round(zoom * 100)}%`;
+  positionDegreesPopover();
 }
 
 function setZoom(next) { zoom = clamp(next, 0.000001, 3); updateView(); }
@@ -336,9 +341,61 @@ function renderMapList() {
   }
 }
 
+function connectedWithinDegrees(startId, depth) {
+  const neighbors = new Map(map.nodes.map(node => [node.id, []]));
+  for (const edge of map.edges) {
+    if (!neighbors.has(edge.from) || !neighbors.has(edge.to)) continue;
+    neighbors.get(edge.from).push(edge.to);
+    neighbors.get(edge.to).push(edge.from);
+  }
+  const visited = new Set([startId]);
+  let frontier = [startId];
+  for (let step = 0; step < depth && frontier.length; step++) {
+    const next = [];
+    for (const id of frontier) for (const neighbor of neighbors.get(id) || []) {
+      if (visited.has(neighbor)) continue;
+      visited.add(neighbor);
+      next.push(neighbor);
+    }
+    frontier = next;
+  }
+  return visited;
+}
+
+function positionDegreesPopover() {
+  const node = degreeAnchorId && getNode(degreeAnchorId);
+  if (!node || selectedIds.size !== 1 || paintColor || selectedEdgeId || connectionDrag) {
+    degreesPopover.hidden = true;
+    return;
+  }
+  const left = node.x * zoom + panX;
+  const top = node.y * zoom + panY;
+  const right = left + node.width * zoom;
+  const bottom = top + node.height * zoom;
+  if (right < 0 || bottom < 0 || left > workspace.clientWidth || top > workspace.clientHeight) {
+    degreesPopover.hidden = true;
+    return;
+  }
+  const width = 186;
+  const height = 78;
+  let x = right + 14;
+  if (x + width + 8 > workspace.clientWidth) x = left - width - 14;
+  degreesPopover.style.left = `${clamp(x, 8, Math.max(8, workspace.clientWidth - width - 8))}px`;
+  degreesPopover.style.top = `${clamp(top, 8, Math.max(8, workspace.clientHeight - height - 8))}px`;
+  degreesPopover.hidden = false;
+}
+
 function updateControls() {
+  const singleId = selectedIds.size === 1 && !selectedEdgeId && !paintColor ? [...selectedIds][0] : null;
+  if (singleId !== degreeAnchorId) {
+    degreeAnchorId = singleId;
+    degreeDepth = 0;
+    degreesSelect.value = "0";
+  }
+  const highlighted = singleId ? connectedWithinDegrees(singleId, degreeDepth) : new Set();
   for (const element of nodesLayer.children) {
     element.classList.toggle("selected", selectedIds.has(element.dataset.id));
+    element.classList.toggle("degree-highlight", highlighted.has(element.dataset.id));
   }
   for (const element of [...connectionsLayer.children, ...crossingConnectionsLayer.children]) {
     if (element.classList.contains("connection")) element.classList.toggle("selected", element.dataset.id === selectedEdgeId);
@@ -357,6 +414,7 @@ function updateControls() {
     : paintColor === "clear" ? "Click an oval to remove all its colors. Drag to move it."
     : paintColor ? `Click ovals to toggle ${paintColor.toLowerCase()}. Drag to move them.`
     : "Drag to pan · Shift-drag to select ovals · Scroll to zoom";
+  positionDegreesPopover();
 }
 
 function updateSearch() {
@@ -526,6 +584,7 @@ function onNodePointerMove(event) {
   element.classList.add("dragging");
   spreadNeighbors(drag.positions.map(position => position.id));
   renderEdges();
+  positionDegreesPopover();
 }
 
 function onNodePointerUp(event) {
@@ -640,6 +699,7 @@ function moveResize(event) {
   }
   spreadNeighbors(resize.nodes.map(node => node.id));
   renderEdges();
+  positionDegreesPopover();
 }
 
 function endResize(event) {
@@ -836,6 +896,13 @@ redoButton.addEventListener("click", () => travelHistory(1));
 fitAllButton.addEventListener("click", fitAll);
 themeButton.addEventListener("click", toggleTheme);
 moveToolButton.addEventListener("click", () => setPaintTool(null));
+degreesSelect.addEventListener("change", () => {
+  degreeDepth = clamp(Number(degreesSelect.value) || 0, 0, 10);
+  updateControls();
+});
+degreesPopover.addEventListener("pointerdown", event => event.stopPropagation());
+degreesPopover.addEventListener("dblclick", event => event.stopPropagation());
+window.addEventListener("resize", positionDegreesPopover);
 clearColorsButton.addEventListener("click", () => setPaintTool("clear"));
 clearAllColorsButton.addEventListener("click", () => {
   if (editingId) document.activeElement?.blur();
@@ -852,7 +919,7 @@ workspace.addEventListener("dblclick", event => {
   addNode(point.x, point.y);
 });
 workspace.addEventListener("pointerdown", event => {
-  if (!event.shiftKey || event.button !== 0 || editingId || event.target.closest(".resize-handle, input")) return;
+  if (!event.shiftKey || event.button !== 0 || editingId || event.target.closest(".resize-handle, .degrees-popover, input")) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   const point = screenPoint(event);

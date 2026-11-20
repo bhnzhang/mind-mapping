@@ -37,7 +37,7 @@ class Element {
   remove() {}
 }
 
-const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "theme-toggle", "theme-color", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
+const ids = ["workspace", "canvas", "selection-box", "degrees-popover", "degrees-select", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "theme-toggle", "theme-color", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
 const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
 const storage = new Map();
 storage.set("open-map-theme", "dark");
@@ -80,6 +80,37 @@ assert.equal(run("map.edges.length"), 5);
 assert.equal(run("map.nodes[0].text"), "My ideas");
 assert.equal(run("map.nodes.slice(1).every((node, index) => node.text === `Idea ${index + 1}`)"), true);
 assert.equal(run("map.edges.every(edge => edge.from === map.nodes[0].id && map.nodes.some(node => node.id === edge.to))"), true);
+run(`{
+  globalThis.originalGraph = { nodes: map.nodes, edges: map.edges };
+  map.nodes = ["a", "b", "c", "d"].map((id, index) => ({ id, x: index * 220, y: 100, width: 154, height: 82, text: id, groups: [] }));
+  map.edges = [{ id: "a-b", from: "a", to: "b" }, { id: "b-c", from: "b", to: "c" }];
+  panX = 0; panY = 0; setZoom(1);
+  render();
+  selectNode("a");
+}`);
+const highlighted = () => elements.nodes.children.filter(node => node.classList.contains("degree-highlight")).map(node => node.dataset.id);
+assert.deepEqual(highlighted(), ["a"]);
+assert.equal(elements["degrees-popover"].hidden, false);
+elements["degrees-select"].value = "1";
+elements["degrees-select"].listeners.change[0]();
+assert.deepEqual(highlighted(), ["a", "b"]);
+elements["degrees-select"].value = "2";
+elements["degrees-select"].listeners.change[0]();
+assert.deepEqual(highlighted(), ["a", "b", "c"]);
+elements["degrees-select"].value = "10";
+elements["degrees-select"].listeners.change[0]();
+assert.deepEqual(highlighted(), ["a", "b", "c"]);
+run('selectNode("c")');
+assert.equal(elements["degrees-select"].value, "0");
+assert.deepEqual(highlighted(), ["c"]);
+run('setPaintTool("Red")');
+assert.equal(elements["degrees-popover"].hidden, true);
+run('setPaintTool(null)');
+assert.deepEqual(highlighted(), ["c"]);
+run('selectedIds = new Set(["a", "c"]); updateControls()');
+assert.deepEqual(highlighted(), []);
+assert.equal(elements["degrees-popover"].hidden, true);
+run('map.nodes = originalGraph.nodes; map.edges = originalGraph.edges; selectedIds.clear(); render()');
 elements["new-map"].click();
 assert.equal(run("library.maps.length"), 2);
 assert.equal(run("map.nodes.length"), 1);
