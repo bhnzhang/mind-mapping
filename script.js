@@ -352,8 +352,8 @@ function updateControls() {
   hint.textContent = marquee ? "Drag a box around ovals to select them."
     : selectedEdgeId ? "Connection selected. Press Delete or use Delete link."
     : connectionDrag ? "Release over another oval to connect."
-    : resize ? "Drag the square to resize this oval."
-    : selectedIds.size > 1 ? `${selectedIds.size} ovals selected. Drag one to move them together.`
+    : resize ? `Drag the square to resize ${resize.nodes.length > 1 ? "the selected ovals" : "this oval"}.`
+    : selectedIds.size > 1 ? `${selectedIds.size} ovals selected. Drag one to move them together, or a corner to resize them.`
     : paintColor === "clear" ? "Click an oval to remove all its colors. Drag to move it."
     : paintColor ? `Click ovals to toggle ${paintColor.toLowerCase()}. Drag to move them.`
     : "Drag to pan · Shift-drag to select ovals · Scroll to zoom";
@@ -597,12 +597,14 @@ function startResize(event, id, corner) {
   if (event.button !== 0 || editingId) return;
   event.preventDefault();
   event.stopPropagation();
-  selectNode(id);
-  const node = getNode(id);
+  if (!selectedIds.has(id)) selectNode(id);
   const point = canvasPoint(event);
   resize = {
-    id, corner, pointerId: event.pointerId, startX: point.x, startY: point.y,
-    left: node.x, top: node.y, right: node.x + node.width, bottom: node.y + node.height,
+    corner, pointerId: event.pointerId, startX: point.x, startY: point.y,
+    nodes: [...selectedIds].map(nodeId => {
+      const node = getNode(nodeId);
+      return { id: nodeId, left: node.x, top: node.y, right: node.x + node.width, bottom: node.y + node.height };
+    }),
   };
   const handle = event.currentTarget;
   handle.setPointerCapture(event.pointerId);
@@ -614,25 +616,29 @@ function startResize(event, id, corner) {
 
 function moveResize(event) {
   if (!resize || event.pointerId !== resize.pointerId) return;
-  const node = getNode(resize.id);
   const point = canvasPoint(event);
   const dx = point.x - resize.startX;
   const dy = point.y - resize.startY;
-  let { left, right, top, bottom } = resize;
-  if (resize.corner.includes("w")) left = Math.min(left + dx, right - MIN_WIDTH);
-  else right = Math.max(right + dx, left + MIN_WIDTH);
-  if (resize.corner.includes("n")) top = Math.min(top + dy, bottom - MIN_HEIGHT);
-  else bottom = Math.max(bottom + dy, top + MIN_HEIGHT);
-  node.x = left;
-  node.y = top;
-  node.width = right - left;
-  node.height = bottom - top;
-  const element = nodesLayer.querySelector(`[data-id="${node.id}"]`);
-  element.style.left = `${node.x}px`;
-  element.style.top = `${node.y}px`;
-  element.style.width = `${node.width}px`;
-  element.style.height = `${node.height}px`;
-  spreadNeighbors(node.id);
+  for (const original of resize.nodes) {
+    const node = getNode(original.id);
+    let { left, right, top, bottom } = original;
+    if (resize.corner.includes("w")) left = Math.min(left + dx, right - MIN_WIDTH);
+    else right = Math.max(right + dx, left + MIN_WIDTH);
+    if (resize.corner.includes("n")) top = Math.min(top + dy, bottom - MIN_HEIGHT);
+    else bottom = Math.max(bottom + dy, top + MIN_HEIGHT);
+    node.x = left;
+    node.y = top;
+    node.width = right - left;
+    node.height = bottom - top;
+    const element = nodesLayer.querySelector(`[data-id="${node.id}"]`);
+    if (element) {
+      element.style.left = `${node.x}px`;
+      element.style.top = `${node.y}px`;
+      element.style.width = `${node.width}px`;
+      element.style.height = `${node.height}px`;
+    }
+  }
+  spreadNeighbors(resize.nodes.map(node => node.id));
   renderEdges();
 }
 

@@ -201,6 +201,27 @@ run("onNodePointerUp({ type: 'pointerup', pointerId: 5, currentTarget: sourceNod
 assert.equal(run("map.nodes[0].x"), 140);
 assert.equal(run("map.nodes[1].x"), 340);
 
+const beforeGroupResize = JSON.parse(run("JSON.stringify(map.nodes.map(({ x, y, width, height }) => ({ x, y, width, height })))"));
+run(`{
+  const node = map.nodes[0];
+  const grip = nodesLayer.children[0].children.find(child => child.className === "resize-handle se");
+  startResize({ button: 0, pointerId: 7, clientX: node.x + node.width, clientY: node.y + node.height, currentTarget: grip,
+    preventDefault() {}, stopPropagation() {} }, node.id, "se");
+  moveResize({ pointerId: 7, clientX: node.x + node.width + 36, clientY: node.y + node.height + 18 });
+  endResize({ pointerId: 7, currentTarget: grip });
+}`);
+assert.equal(run("selectedIds.size"), 2);
+for (let index = 0; index < 2; index++) {
+  assert.equal(run(`map.nodes[${index}].width`), beforeGroupResize[index].width + 36);
+  assert.equal(run(`map.nodes[${index}].height`), beforeGroupResize[index].height + 18);
+  assert.equal(run(`map.nodes[${index}].x`), beforeGroupResize[index].x);
+  assert.equal(run(`map.nodes[${index}].y`), beforeGroupResize[index].y);
+}
+elements.undo.click();
+assert.deepEqual(JSON.parse(run("JSON.stringify(map.nodes.map(({ x, y, width, height }) => ({ x, y, width, height })))")), beforeGroupResize);
+elements.redo.click();
+assert.equal(run("map.nodes[1].width"), beforeGroupResize[1].width + 36);
+
 assert.equal(JSON.parse(storage.get("open-map-library-v2")).maps.length, 2);
 run("saveFile()");
 assert.match(document.body.children.at(-1).download, /\.openmap\.json$/);

@@ -14,7 +14,7 @@ On first use, the starting map has “My ideas” in the center with five connec
 - **Edit text:** Double-click an oval, type, and press Enter. Press Esc to cancel.
 - **Move an oval:** Drag it. Connected lines follow it.
 - **Pan the map:** Drag empty canvas space in any direction; panning has no edge limit.
-- **Select several ovals:** Hold Shift and drag a box around them. Shift-click an oval to add or remove it from the selection. Drag one selected oval to move the group, or press Delete to remove the group.
+- **Select several ovals:** Hold Shift and drag a box around them. Shift-click an oval to add or remove it from the selection. Drag one selected oval to move the group, drag a corner square to resize every selected oval, or press Delete to remove the group.
 - **Zoom:** Scroll the mouse wheel over the canvas. Zoom centers on the pointer; the current level appears in the footer. Labels grow within their ovals as you zoom out so they remain easier to read.
 - **Fit all:** Click the ⛶ button beside Undo and Redo to center every oval and fit the map on screen.
 - **Dark mode:** Click the moon/sun button in the toolbar to switch themes. The choice is remembered in this browser.
