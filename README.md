@@ -17,6 +17,7 @@ On first use, the starting map has “My ideas” in the center with five connec
 - **Select several ovals:** Hold Shift and drag a box around them. Shift-click an oval to add or remove it from the selection. Drag one selected oval to move the group, or press Delete to remove the group.
 - **Zoom:** Scroll the mouse wheel over the canvas. Zoom centers on the pointer; the current level appears in the footer. Labels grow within their ovals as you zoom out so they remain easier to read.
 - **Fit all:** Click the ⛶ button beside Undo and Redo to center every oval and fit the map on screen.
+- **Dark mode:** Click the moon/sun button in the toolbar to switch themes. The choice is remembered in this browser.
 - **Connect ovals:** Drag from anywhere on an oval's outline to another oval. A click on the outline still selects or colors the oval.
 - **Crossing connections:** A connection that crosses an unrelated oval appears above the ovals as a dashed line. Other connections stay solid beneath them.
 - **Delete a connection:** Click its line, then press Delete/Backspace or click **Delete link** in the footer.

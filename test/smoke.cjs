@@ -37,11 +37,13 @@ class Element {
   remove() {}
 }
 
-const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
+const ids = ["workspace", "canvas", "selection-box", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "theme-toggle", "theme-color", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
 const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
 const storage = new Map();
+storage.set("open-map-theme", "dark");
 let confirmResult = true;
 const document = {
+  documentElement: new Element("html"),
   querySelector: selector => elements[selector.slice(1)],
   createElement: tag => new Element(tag),
   createElementNS: (_namespace, tag) => new Element(tag),
@@ -62,6 +64,16 @@ const source = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
 vm.runInContext(source, context);
 const run = code => vm.runInContext(code, context);
 
+assert.equal(document.documentElement.dataset.theme, "dark");
+assert.equal(elements["theme-toggle"]["aria-pressed"], "true");
+assert.equal(elements["theme-color"].content, "#171a20");
+elements["theme-toggle"].click();
+assert.equal(document.documentElement.dataset.theme, "light");
+assert.equal(elements["theme-toggle"]["aria-pressed"], "false");
+assert.equal(storage.get("open-map-theme"), "light");
+elements["theme-toggle"].click();
+assert.equal(document.documentElement.dataset.theme, "dark");
+assert.equal(storage.get("open-map-theme"), "dark");
 assert.equal(run("library.maps.length"), 1);
 assert.equal(run("map.nodes.length"), 6);
 assert.equal(run("map.edges.length"), 5);
@@ -107,6 +119,7 @@ run(`{
   onNodePointerUp({ type: "pointerup", pointerId: 1, currentTarget: element });
 }`);
 assert.equal(run('map.nodes[0].groups.includes("Red")'), true);
+assert.equal(elements.nodes.children[0].classList.contains("colored"), true);
 run('paintNode(map.nodes[1].id)');
 elements["clear-all-colors"].click();
 assert.equal(run('map.nodes.every(node => node.groups.length === 0)'), true);
@@ -256,5 +269,5 @@ run("openFile(importedFile)").then(() => {
   assert.equal(run("library.maps.length"), 1);
   assert.notEqual(run("map.id"), lastId);
   assert.equal(run("map.nodes.length"), 1);
-  console.log("Smoke test passed: starter map, maps, duplication, deletion, history, links, colors, search, unlimited resize, crossing links, pan, fit all, multi-selection, zoom, files, and migration.");
+  console.log("Smoke test passed: theme, starter map, maps, duplication, deletion, history, links, colors, search, unlimited resize, crossing links, pan, fit all, multi-selection, zoom, files, and migration.");
 }).catch(error => { console.error(error); process.exitCode = 1; });

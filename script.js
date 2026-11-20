@@ -1,5 +1,6 @@
 const STORAGE_KEY = "open-map-library-v2";
 const LEGACY_STORAGE_KEY = "open-map-v1";
+const THEME_KEY = "open-map-theme";
 const CANVAS_WIDTH = 2400;
 const CANVAS_HEIGHT = 1600;
 const DEFAULT_WIDTH = 154;
@@ -38,6 +39,8 @@ const deleteLinkButton = document.querySelector("#delete-link");
 const undoButton = document.querySelector("#undo");
 const redoButton = document.querySelector("#redo");
 const fitAllButton = document.querySelector("#fit-all");
+const themeButton = document.querySelector("#theme-toggle");
+const themeColorMeta = document.querySelector("#theme-color");
 const moveToolButton = document.querySelector("#move-tool");
 const clearColorsButton = document.querySelector("#clear-colors");
 const clearAllColorsButton = document.querySelector("#clear-all-colors");
@@ -124,6 +127,23 @@ let marquee = null;
 let zoom = 1;
 let panX = 0;
 let panY = 0;
+let theme = "light";
+try { if (localStorage.getItem(THEME_KEY) === "dark") theme = "dark"; }
+catch { /* Use the default theme when storage is unavailable. */ }
+
+function applyTheme() {
+  document.documentElement.dataset.theme = theme;
+  themeButton.textContent = theme === "dark" ? "☀" : "☾";
+  themeButton.setAttribute("aria-pressed", String(theme === "dark"));
+  themeColorMeta.setAttribute("content", theme === "dark" ? "#171a20" : "#f7f6f2");
+}
+
+function toggleTheme() {
+  theme = theme === "dark" ? "light" : "dark";
+  applyTheme();
+  try { localStorage.setItem(THEME_KEY, theme); }
+  catch { /* The theme still works for this session. */ }
+}
 
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(library)); }
@@ -246,7 +266,7 @@ function isNearEdge(node, point) {
 
 function nodeBackground(node) {
   const fills = node.groups.map(name => COLORS.find(color => color.name === name)?.fill).filter(Boolean);
-  if (!fills.length) return "#f0f0f0";
+  if (!fills.length) return "var(--node-bg)";
   if (fills.length === 1) return fills[0];
   const step = 100 / fills.length;
   const stops = fills.flatMap((color, index) => [`${color} ${(index * step).toFixed(2)}%`, `${color} ${((index + 1) * step).toFixed(2)}%`]);
@@ -350,6 +370,7 @@ function renderNodes() {
   for (const node of map.nodes) {
     const element = document.createElement("div");
     element.className = "node";
+    element.classList.toggle("colored", node.groups.length > 0);
     element.dataset.id = node.id;
     element.style.left = `${node.x}px`;
     element.style.top = `${node.y}px`;
@@ -416,6 +437,7 @@ function paintNode(id) {
   const element = nodesLayer.querySelector(`[data-id="${id}"]`);
   if (element) {
     element.style.background = nodeBackground(node);
+    element.classList.toggle("colored", node.groups.length > 0);
     element.setAttribute("aria-label", `${node.text}${node.groups.length ? `, ${node.groups.join(", ")}` : ""}`);
   }
   commit();
@@ -799,6 +821,7 @@ deleteLinkButton.addEventListener("click", deleteSelected);
 undoButton.addEventListener("click", () => travelHistory(-1));
 redoButton.addEventListener("click", () => travelHistory(1));
 fitAllButton.addEventListener("click", fitAll);
+themeButton.addEventListener("click", toggleTheme);
 moveToolButton.addEventListener("click", () => setPaintTool(null));
 clearColorsButton.addEventListener("click", () => setPaintTool("clear"));
 clearAllColorsButton.addEventListener("click", () => {
@@ -934,6 +957,7 @@ document.addEventListener("keydown", event => {
   }
 });
 
+applyTheme();
 renderMapList();
 render();
 save();
