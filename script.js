@@ -399,7 +399,7 @@ function updateControls() {
     : selectedIds.size > 1 ? `${selectedIds.size} ovals selected. Drag one to move them together, or a corner to resize them.`
     : paintColor === "clear" ? "Click an oval to remove all its colors. Drag to move it."
     : paintColor ? `Click ovals to toggle ${paintColor.toLowerCase()}. Drag to move them.`
-    : "Drag to pan · Shift-drag to select ovals · Scroll to zoom";
+    : "Double-click to add oval · Drag to pan · Shift-drag to select ovals · Scroll to zoom";
 }
 
 function updateSearch() {
