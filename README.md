@@ -21,7 +21,7 @@ On first use, the starting map has “My ideas” in the center with five connec
 - **Connect ovals:** Drag from anywhere on an oval's outline to another oval. A click on the outline still selects or colors the oval.
 - **Crossing connections:** A connection that crosses an unrelated oval appears above the ovals as a dashed line. Other connections stay solid beneath them.
 - **Delete a connection:** Click its line, then press Delete/Backspace or click **Delete link** in the footer.
-- **Resize an oval:** Select it and drag any of the four corner squares. There is no maximum size.
+- **Resize an oval:** Select it and drag any of the four corner squares. The squares grow as you zoom out, with a larger grab area. There is no maximum oval size.
 - **Search bubbles:** Type in the sidebar search field to highlight bubbles whose text contains your search, regardless of letter case. Other bubbles fade; clear the field to show them normally.
 - **Color groups:** Pick a rainbow color in the sidebar, then click anywhere inside ovals to toggle that color. An oval can belong to several groups. **Erase colors** removes the colors from ovals you click. **Clear all colors** removes every oval's colors on the current map in one undoable step.
 - **Undo or redo:** Use the toolbar buttons, Ctrl+Z/Ctrl+Shift+Z, or Ctrl+Y.

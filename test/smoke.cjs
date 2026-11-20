@@ -9,7 +9,7 @@ class Element {
     this.tagName = tag.toUpperCase();
     this.children = [];
     this.dataset = {};
-    this.style = {};
+    this.style = { setProperty(name, value) { this[name] = value; } };
     this.value = "";
     this.listeners = {};
     this.classes = new Set();
@@ -151,10 +151,15 @@ assert.equal(run("normalizeMap(map).nodes[0].height"), run("map.nodes[0].height"
 
 run("setZoom(0.5)");
 const zoomedOutFont = Number.parseFloat(elements.nodes.children[0].style.fontSize);
+const zoomedOutSquare = Number.parseFloat(elements.nodes.children[0].style["--resize-square-size"]);
+const zoomedOutHit = Number.parseFloat(elements.nodes.children[0].style["--resize-hit-size"]);
 assert.ok(zoomedOutFont > 15);
 assert.ok(zoomedOutFont * 0.5 > 7.5 && zoomedOutFont * 0.5 < 15);
+assert.ok(zoomedOutSquare > 13);
+assert.ok(zoomedOutHit * 0.5 >= 24);
 run("renderNodes()");
 assert.equal(Number.parseFloat(elements.nodes.children[0].style.fontSize), zoomedOutFont);
+assert.equal(Number.parseFloat(elements.nodes.children[0].style["--resize-square-size"]), zoomedOutSquare);
 run("panX = 0; panY = 0; setZoom(2)");
 assert.equal(elements["zoom-label"].textContent, "200%");
 assert.equal(run("canvasPoint({ clientX: 300, clientY: 200 }).x"), 150);

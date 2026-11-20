@@ -132,15 +132,22 @@ button { cursor: pointer; }
 .node-label { pointer-events: none; }
 .resize-handle {
   display: none; position: absolute;
-  width: 13px; height: 13px; padding: 0; border: 2px solid #222; border-radius: 0;
-  background: #fff; box-shadow: 0 1px 3px #0002;
+  width: var(--resize-hit-size, 24px); height: var(--resize-hit-size, 24px);
+  padding: 0; border: 0; border-radius: 0; background: transparent;
   cursor: nwse-resize; touch-action: none;
 }
+.resize-handle::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: var(--resize-square-size, 13px); height: var(--resize-square-size, 13px);
+  transform: translate(-50%, -50%); pointer-events: none;
+  border: var(--resize-border-width, 2px) solid #222; border-radius: 0;
+  background: #fff; box-shadow: 0 1px 3px #0002;
+}
 .node.selected .resize-handle { display: block; }
-.resize-handle.nw { left: -8px; top: -8px; }
-.resize-handle.ne { right: -8px; top: -8px; cursor: nesw-resize; }
-.resize-handle.sw { left: -8px; bottom: -8px; cursor: nesw-resize; }
-.resize-handle.se { right: -8px; bottom: -8px; }
+.resize-handle.nw { left: var(--resize-hit-offset, -12px); top: var(--resize-hit-offset, -12px); }
+.resize-handle.ne { right: var(--resize-hit-offset, -12px); top: var(--resize-hit-offset, -12px); cursor: nesw-resize; }
+.resize-handle.sw { left: var(--resize-hit-offset, -12px); bottom: var(--resize-hit-offset, -12px); cursor: nesw-resize; }
+.resize-handle.se { right: var(--resize-hit-offset, -12px); bottom: var(--resize-hit-offset, -12px); }
 .node input {
   width: 100%; min-width: 0; padding: 2px 0; border: 0; outline: 0;
   background: transparent; color: inherit; text-align: center; font-size: inherit; font-weight: inherit;

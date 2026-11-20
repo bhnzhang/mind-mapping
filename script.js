@@ -183,9 +183,16 @@ function applyNodeTypography(element) {
   const reducedZoom = Math.min(zoom, 1);
   // The font gains size in map coordinates as the map shrinks, while its
   // on-screen size still changes gently with zoom.
-  element.style.fontSize = `${Math.min(36, 15 * reducedZoom ** -0.65).toFixed(2)}px`;
+  const fontScale = Math.min(36 / 15, reducedZoom ** -0.65);
+  element.style.fontSize = `${(15 * fontScale).toFixed(2)}px`;
   element.style.padding = `${(15 * reducedZoom).toFixed(2)}px ${(20 * reducedZoom).toFixed(2)}px`;
   element.style.lineHeight = (1.05 + 0.2 * reducedZoom).toFixed(2);
+  const squareSize = Math.max(13 * fontScale, 10 / zoom);
+  const hitSize = Math.max(24 * fontScale, 24 / zoom);
+  element.style.setProperty("--resize-square-size", `${squareSize.toFixed(2)}px`);
+  element.style.setProperty("--resize-hit-size", `${hitSize.toFixed(2)}px`);
+  element.style.setProperty("--resize-hit-offset", `${(-hitSize / 2).toFixed(2)}px`);
+  element.style.setProperty("--resize-border-width", `${Math.max(2, 1.5 / zoom).toFixed(2)}px`);
 }
 
 function updateView(updateTypography = true) {
