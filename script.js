@@ -382,6 +382,7 @@ function updateControls() {
   for (const element of nodesLayer.children) {
     element.classList.toggle("selected", selectedIds.has(element.dataset.id));
     element.classList.toggle("degree-highlight", highlighted.has(element.dataset.id));
+    element.classList.toggle("degree-dim", !!singleId && degreeDepth > 0 && !highlighted.has(element.dataset.id));
   }
   for (const element of [...connectionsLayer.children, ...crossingConnectionsLayer.children]) {
     if (element.classList.contains("connection")) element.classList.toggle("selected", element.dataset.id === selectedEdgeId);
