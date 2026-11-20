@@ -22,7 +22,6 @@ const COLORS = [
 const workspace = document.querySelector("#workspace");
 const canvas = document.querySelector("#canvas");
 const selectionBox = document.querySelector("#selection-box");
-const degreesControl = document.querySelector("#degrees-control");
 const degreesValue = document.querySelector("#degrees-value");
 const degreesUp = document.querySelector("#degrees-up");
 const degreesDown = document.querySelector("#degrees-down");
@@ -944,8 +943,6 @@ degreesDown.addEventListener("click", () => {
   degreeDepth = Math.max(0, degreeDepth - 1);
   updateControls();
 });
-degreesControl.addEventListener("pointerdown", event => event.stopPropagation());
-degreesControl.addEventListener("dblclick", event => event.stopPropagation());
 clearColorsButton.addEventListener("click", () => setPaintTool("clear"));
 clearAllColorsButton.addEventListener("click", () => {
   if (editingId) document.activeElement?.blur();
@@ -962,7 +959,7 @@ workspace.addEventListener("dblclick", event => {
   addNode(point.x, point.y);
 });
 workspace.addEventListener("pointerdown", event => {
-  if (!event.shiftKey || event.button !== 0 || editingId || event.target.closest(".resize-handle, .degrees-control, input")) return;
+  if (!event.shiftKey || event.button !== 0 || editingId || event.target.closest(".resize-handle, input")) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   const point = screenPoint(event);
