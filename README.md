@@ -30,7 +30,7 @@ On first use, the starting map has “My ideas” in the center with five connec
 - **Copy, cut, or paste bubbles:** Select one or several bubbles and press Ctrl+C, Ctrl+X, or Ctrl+V (⌘ on Mac). Paste centers the copied bubbles at the mouse position on the canvas and keeps connections between them.
 - **Delete an oval:** Select it and press Delete/Backspace.
 - **Multiple maps:** Create and switch maps in the sidebar. **Duplicate map** makes an independent copy of the active map and opens it. Rename a map with **Rename map**, or double-click its name in the list. **Delete current map** removes it after confirmation; deleting the last map creates a fresh blank map.
-- **Save or open a file:** Use **Save file** to download the current map as `.openmap.json`. **Open file** imports a saved map as a new map in your sidebar.
+- **Save or open files:** Use **Save file** to download the current map as `.openmap.json`. **Download all maps** saves every map in a ZIP, with one `.openmap.json` file per map. Extract the ZIP and use **Open file(s)** to select and import several maps at once.
 
 The default oval style is gray with a black outline. Color groups are optional.
 

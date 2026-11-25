@@ -32,9 +32,10 @@
             <button class="tool-option delete-map" id="delete-map" type="button">Delete current map</button>
             <div class="file-actions">
               <button class="tool-option" id="save-file" type="button">↓ Save file</button>
-              <button class="tool-option" id="open-file" type="button">↑ Open file</button>
+              <button class="tool-option" id="save-all" type="button">↓ Download all maps</button>
+              <button class="tool-option" id="open-file" type="button">↑ Open file(s)</button>
             </div>
-            <input id="file-input" type="file" accept=".json,.openmap,application/json" hidden />
+            <input id="file-input" type="file" accept=".json,.openmap,application/json" multiple hidden />
           </section>
           <section class="sidebar-section">
             <label class="palette-title" for="search-nodes">Search bubbles</label>
@@ -76,6 +77,6 @@
         <div class="footer-right"><span id="zoom-label">100%</span><span>Double-click to edit · Drag corner squares to resize</span><button id="delete-link" type="button" hidden>Delete link</button></div>
       </footer>
     </div>
-    <script src="script.js?v=f781237c" defer></script>
+    <script src="script.js?v=2931080b" defer></script>
   </body>
 </html>

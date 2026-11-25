@@ -37,7 +37,7 @@ class Element {
   remove() {}
 }
 
-const ids = ["main", "palette", "sidebar-resizer", "workspace", "canvas", "selection-box", "degrees-control", "degrees-value", "degrees-up", "degrees-down", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "theme-toggle", "theme-color", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
+const ids = ["main", "palette", "sidebar-resizer", "workspace", "canvas", "selection-box", "degrees-control", "degrees-value", "degrees-up", "degrees-down", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "save-all", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "theme-toggle", "theme-color", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
 const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
 const storage = new Map();
 storage.set("open-map-theme", "dark");
@@ -60,6 +60,7 @@ const context = vm.createContext({
   setTimeout,
   URL,
   Blob,
+  TextEncoder,
 });
 const source = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
 vm.runInContext(source, context);
@@ -334,9 +335,42 @@ context.importedFile = {
   name: "backup.openmap.json",
   text: async () => run('JSON.stringify({ format: "open-map", version: 1, map })'),
 };
-run("openFile(importedFile)").then(() => {
+run("openFile(importedFile)").then(async () => {
   assert.equal(run("library.maps.length"), 3);
   assert.equal(run("map.name"), "Career ideas");
+  const archive = run("createMapsArchive()");
+  assert.equal(archive.type, "application/zip");
+  assert.equal(run('crc32(new TextEncoder().encode("123456789"))'), 0xcbf43926);
+  const bytes = new Uint8Array(await archive.arrayBuffer());
+  const view = new DataView(bytes.buffer);
+  const decoder = new TextDecoder();
+  let offset = 0;
+  const entries = [];
+  for (let index = 0; index < 3; index++) {
+    assert.equal(view.getUint32(offset, true), 0x04034b50);
+    assert.equal(view.getUint16(offset + 8, true), 0);
+    const size = view.getUint32(offset + 18, true);
+    const nameLength = view.getUint16(offset + 26, true);
+    const name = decoder.decode(bytes.subarray(offset + 30, offset + 30 + nameLength));
+    const data = bytes.subarray(offset + 30 + nameLength, offset + 30 + nameLength + size);
+    context.archiveData = data;
+    assert.equal(view.getUint32(offset + 14, true), run("crc32(archiveData)"));
+    const raw = decoder.decode(data);
+    assert.equal(JSON.parse(raw).format, "open-map");
+    entries.push({ name, raw });
+    offset += 30 + nameLength + size;
+  }
+  assert.deepEqual(entries.map(entry => entry.name), ["My-ideas.openmap.json", "Career-ideas.openmap.json", "Career-ideas-2.openmap.json"]);
+  assert.deepEqual(entries.map(entry => JSON.parse(entry.raw).map.id), JSON.parse(run("JSON.stringify(library.maps.map(item => item.id))")));
+  assert.equal(view.getUint32(offset, true), 0x02014b50);
+  const end = bytes.length - 22;
+  assert.equal(view.getUint32(end, true), 0x06054b50);
+  assert.equal(view.getUint16(end + 10, true), 3);
+  assert.equal(view.getUint32(end + 16, true), offset);
+  assert.equal(offset + view.getUint32(end + 12, true), end);
+  elements["save-all"].click();
+  assert.equal(document.body.children.at(-1).download, "all-maps.zip");
+  context.batchFiles = entries.map(({ name, raw }) => ({ name, text: async () => raw }));
   const originalId = run("map.id");
   const originalNodeId = run("map.nodes[0].id");
   const originalNodeText = run("map.nodes[0].text");
@@ -380,6 +414,14 @@ run("openFile(importedFile)").then(() => {
   assert.equal(elements["crossing-connections"].children.length, 0);
   assert.equal(elements.connections.children.length, 1);
   run("map.nodes = crossingTest.savedNodes; map.edges = crossingTest.savedEdges; selectedEdgeId = null; renderEdges()");
+  elements["file-input"].files = context.batchFiles;
+  await elements["file-input"].listeners.change[0]();
+  assert.equal(run("library.maps.length"), 8);
+  assert.equal(run("map.name"), "Career ideas");
+  assert.equal(elements["file-input"].value, "");
+  assert.equal(run("library.maps.every(item => item.nodes.length > 0)"), true);
+  assert.equal(run("map.nodes.length"), JSON.parse(entries[2].raw).map.nodes.length);
+  assert.equal(run("map.edges.length"), JSON.parse(entries[2].raw).map.edges.length);
   const mapCount = run("library.maps.length");
   const deletedId = run("map.id");
   context.deletedId = deletedId;
@@ -399,5 +441,5 @@ run("openFile(importedFile)").then(() => {
   assert.equal(run("library.maps.length"), 1);
   assert.notEqual(run("map.id"), lastId);
   assert.equal(run("map.nodes.length"), 1);
-  console.log("Smoke test passed: theme colors, degree control, clipboard, maps, history, links, search, resize, pan, selection, zoom, files, and migration.");
+  console.log("Smoke test passed: theme colors, degree control, clipboard, maps, ZIP export, multi-file import, history, links, search, resize, pan, selection, zoom, and migration.");
 }).catch(error => { console.error(error); process.exitCode = 1; });

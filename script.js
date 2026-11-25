@@ -43,6 +43,7 @@ const duplicateMapButton = document.querySelector("#duplicate-map");
 const renameMapButton = document.querySelector("#rename-map");
 const deleteMapButton = document.querySelector("#delete-map");
 const saveFileButton = document.querySelector("#save-file");
+const saveAllButton = document.querySelector("#save-all");
 const openFileButton = document.querySelector("#open-file");
 const fileInput = document.querySelector("#file-input");
 const deleteLinkButton = document.querySelector("#delete-link");
@@ -912,30 +913,118 @@ function pasteBubbles(event) {
   commit();
 }
 
-function saveFile() {
-  const file = new Blob([JSON.stringify({ format: "open-map", version: 1, map }, null, 2)], { type: "application/json" });
+function downloadBlob(file, filename) {
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${map.name.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-|-$/g, "") || "map"}.openmap.json`;
+  link.download = filename;
   document.body.append(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function openFile(file) {
-  try {
-    const raw = JSON.parse(await file.text());
-    const imported = normalizeMap(raw.map || raw, file.name.replace(/\.(openmap\.)?json$/i, ""));
-    imported.id = crypto.randomUUID();
-    library.maps.push(imported);
-    save();
-    switchMap(imported.id);
-  } catch (error) {
-    window.alert(`Could not open map: ${error.message}`);
-  }
+function mapFilename(item) {
+  return item.name.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-|-$/g, "") || "map";
 }
+
+function saveFile() {
+  const file = new Blob([JSON.stringify({ format: "open-map", version: 1, map }, null, 2)], { type: "application/json" });
+  downloadBlob(file, `${mapFilename(map)}.openmap.json`);
+}
+
+function crc32(bytes) {
+  let crc = -1;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+function createMapsArchive() {
+  const encoder = new TextEncoder();
+  const files = [];
+  const usedNames = new Set();
+  for (const item of library.maps) {
+    const base = mapFilename(item);
+    let name = `${base}.openmap.json`;
+    let suffix = 2;
+    while (usedNames.has(name.toLowerCase())) name = `${base}-${suffix++}.openmap.json`;
+    usedNames.add(name.toLowerCase());
+    files.push({
+      name: encoder.encode(name),
+      data: encoder.encode(JSON.stringify({ format: "open-map", version: 1, map: item }, null, 2)),
+    });
+  }
+  const localParts = [];
+  const directoryParts = [];
+  let offset = 0;
+  let directorySize = 0;
+  for (const { name, data } of files) {
+    const checksum = crc32(data);
+    const local = new Uint8Array(30);
+    const l = new DataView(local.buffer);
+    l.setUint32(0, 0x04034b50, true);
+    l.setUint16(4, 20, true);
+    l.setUint16(6, 0x0800, true);
+    l.setUint16(12, 0x21, true);
+    l.setUint32(14, checksum, true);
+    l.setUint32(18, data.length, true);
+    l.setUint32(22, data.length, true);
+    l.setUint16(26, name.length, true);
+    localParts.push(local, name, data);
+
+    const central = new Uint8Array(46);
+    const c = new DataView(central.buffer);
+    c.setUint32(0, 0x02014b50, true);
+    c.setUint16(4, 20, true);
+    c.setUint16(6, 20, true);
+    c.setUint16(8, 0x0800, true);
+    c.setUint16(14, 0x21, true);
+    c.setUint32(16, checksum, true);
+    c.setUint32(20, data.length, true);
+    c.setUint32(24, data.length, true);
+    c.setUint16(28, name.length, true);
+    c.setUint32(42, offset, true);
+    directoryParts.push(central, name);
+    offset += local.length + name.length + data.length;
+    directorySize += central.length + name.length;
+  }
+  const end = new Uint8Array(22);
+  const e = new DataView(end.buffer);
+  e.setUint32(0, 0x06054b50, true);
+  e.setUint16(8, files.length, true);
+  e.setUint16(10, files.length, true);
+  e.setUint32(12, directorySize, true);
+  e.setUint32(16, offset, true);
+  return new Blob([...localParts, ...directoryParts, end], { type: "application/zip" });
+}
+
+function downloadAllMaps() { downloadBlob(createMapsArchive(), "all-maps.zip"); }
+
+async function openFiles(files) {
+  const imported = [];
+  const errors = [];
+  for (const file of files) {
+    try {
+      const raw = JSON.parse(await file.text());
+      const item = normalizeMap(raw.map || raw, file.name.replace(/\.(openmap\.)?json$/i, ""));
+      item.id = crypto.randomUUID();
+      imported.push(item);
+    } catch (error) {
+      errors.push(`${file.name}: ${error.message}`);
+    }
+  }
+  if (imported.length) {
+    library.maps.push(...imported);
+    save();
+    switchMap(imported.at(-1).id);
+  }
+  if (errors.length) window.alert(`Could not open ${errors.length} map file(s):\n${errors.join("\n")}`);
+}
+
+async function openFile(file) { await openFiles([file]); }
 
 newMapButton.addEventListener("click", () => {
   const fresh = blankMap(`Untitled map ${library.maps.length + 1}`);
@@ -948,9 +1037,10 @@ deleteMapButton.addEventListener("click", deleteMap);
 searchInput.addEventListener("input", updateSearch);
 renameMapButton.addEventListener("click", renameMap);
 saveFileButton.addEventListener("click", saveFile);
+saveAllButton.addEventListener("click", downloadAllMaps);
 openFileButton.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", async () => {
-  if (fileInput.files?.[0]) await openFile(fileInput.files[0]);
+  if (fileInput.files?.length) await openFiles(fileInput.files);
   fileInput.value = "";
 });
 sidebarResizer.addEventListener("pointerdown", event => {
