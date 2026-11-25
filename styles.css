@@ -69,8 +69,19 @@ button { cursor: pointer; }
 .main { display: flex; flex: 1; min-height: 0; }
 .palette {
   width: 185px; flex: none; padding: 20px 14px; background: var(--surface);
-  border-right: 1px solid var(--divider); overflow-y: auto;
+  overflow-y: auto;
 }
+.sidebar-resizer {
+  position: relative; z-index: 2; flex: 0 0 8px;
+  background: var(--surface); cursor: col-resize; touch-action: none;
+}
+.sidebar-resizer::before {
+  content: ""; position: absolute; inset: 0 auto 0 3px; width: 2px;
+  background: var(--divider);
+}
+.sidebar-resizer:hover::before, .sidebar-resizer:focus-visible::before, .main.sidebar-resizing .sidebar-resizer::before { background: var(--active-border); }
+.sidebar-resizer:focus-visible { outline: 2px solid var(--active-border); outline-offset: -2px; }
+.main.sidebar-resizing { user-select: none; }
 .sidebar-section + .sidebar-section { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--divider); }
 .palette-title { font-size: 14px; font-weight: 750; }
 .search-input { width: 100%; margin-top: 10px; padding: 8px 9px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 13px; }

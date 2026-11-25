@@ -6,7 +6,7 @@
     <meta id="theme-color" name="theme-color" content="#f7f6f2" />
     <title>Open Map</title>
     <!-- Update these versions when the static assets change so browsers fetch the matching files. -->
-    <link rel="stylesheet" href="styles.css?v=621c0365" />
+    <link rel="stylesheet" href="styles.css?v=b5f2a793" />
   </head>
   <body>
     <div class="app">
@@ -21,7 +21,7 @@
         <span class="saved-note">Maps save automatically in this browser</span>
       </header>
 
-      <div class="main">
+      <div class="main" id="main">
         <aside class="palette" aria-label="Map tools">
           <section class="sidebar-section">
             <div class="palette-title">Maps</div>
@@ -60,6 +60,7 @@
           <button class="tool-option clear-all" id="clear-all-colors" type="button">Clear all colors</button>
           </section>
         </aside>
+        <div id="sidebar-resizer" class="sidebar-resizer" role="separator" tabindex="0" aria-label="Resize left sidebar" aria-orientation="vertical" aria-valuemin="120" aria-valuenow="185"></div>
         <div class="workspace" id="workspace" aria-label="Mind map canvas">
           <div class="canvas" id="canvas">
             <svg class="connections" id="connections" width="2400" height="1600" aria-hidden="true"></svg>
@@ -75,6 +76,6 @@
         <div class="footer-right"><span id="zoom-label">100%</span><span>Double-click to edit · Drag corner squares to resize</span><button id="delete-link" type="button" hidden>Delete link</button></div>
       </footer>
     </div>
-    <script src="script.js?v=79f57f2b" defer></script>
+    <script src="script.js?v=f781237c" defer></script>
   </body>
 </html>

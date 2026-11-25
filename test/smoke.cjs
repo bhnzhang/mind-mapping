@@ -37,7 +37,7 @@ class Element {
   remove() {}
 }
 
-const ids = ["workspace", "canvas", "selection-box", "degrees-control", "degrees-value", "degrees-up", "degrees-down", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "theme-toggle", "theme-color", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
+const ids = ["main", "palette", "sidebar-resizer", "workspace", "canvas", "selection-box", "degrees-control", "degrees-value", "degrees-up", "degrees-down", "nodes", "connections", "crossing-connections", "palette-colors", "map-list", "search-nodes", "search-count", "new-map", "duplicate-map", "rename-map", "delete-map", "save-file", "open-file", "file-input", "delete-link", "undo", "redo", "fit-all", "theme-toggle", "theme-color", "move-tool", "clear-colors", "clear-all-colors", "hint", "zoom-label"];
 const elements = Object.fromEntries(ids.map(id => [id, new Element()]));
 const storage = new Map();
 storage.set("open-map-theme", "dark");
@@ -75,6 +75,20 @@ assert.equal(storage.get("open-map-theme"), "light");
 elements["theme-toggle"].click();
 assert.equal(document.documentElement.dataset.theme, "dark");
 assert.equal(storage.get("open-map-theme"), "dark");
+const divider = elements["sidebar-resizer"];
+assert.equal(divider["aria-valuenow"], "185");
+divider.listeners.pointerdown[0]({ button: 0, pointerId: 21, clientX: 185, preventDefault() {} });
+divider.listeners.pointermove[0]({ pointerId: 21, clientX: 335 });
+assert.equal(elements.palette.style.width, "335px");
+divider.listeners.pointerup[0]({ pointerId: 21 });
+assert.equal(storage.get("open-map-sidebar-width"), "335");
+divider.listeners.keydown[0]({ key: "ArrowLeft", preventDefault() {} });
+assert.equal(elements.palette.style.width, "319px");
+divider.listeners.keydown[0]({ key: "Home", preventDefault() {} });
+assert.equal(elements.palette.style.width, "120px");
+divider.listeners.keydown[0]({ key: "End", preventDefault() {} });
+assert.equal(elements.palette.style.width, "772px");
+run("setSidebarWidth(185)");
 assert.equal(run("library.maps.length"), 1);
 assert.equal(run("map.nodes.length"), 6);
 assert.equal(run("map.edges.length"), 5);

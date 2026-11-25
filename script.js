@@ -9,6 +9,9 @@ const MIN_WIDTH = 100;
 const MIN_HEIGHT = 60;
 const SPACING = 20;
 const CLIPBOARD_TYPE = "application/x-open-map-bubbles";
+const SIDEBAR_WIDTH_KEY = "open-map-sidebar-width";
+const MIN_SIDEBAR_WIDTH = 120;
+const MIN_WORKSPACE_WIDTH = 220;
 const COLORS = [
   { name: "Red", swatch: "#e5484d", fill: "#ffd7d9", darkFill: "#67313b" },
   { name: "Orange", swatch: "#ef8b2c", fill: "#ffe2c4", darkFill: "#684426" },
@@ -19,6 +22,9 @@ const COLORS = [
   { name: "Violet", swatch: "#a65acb", fill: "#efd6fa", darkFill: "#593968" },
 ];
 
+const main = document.querySelector("#main");
+const palette = document.querySelector(".palette");
+const sidebarResizer = document.querySelector("#sidebar-resizer");
 const workspace = document.querySelector("#workspace");
 const canvas = document.querySelector("#canvas");
 const selectionBox = document.querySelector("#selection-box");
@@ -136,6 +142,7 @@ let panY = 0;
 let theme = "light";
 let lastPointer = null;
 let copiedBubbles = null;
+let sidebarDrag = null;
 try { if (localStorage.getItem(THEME_KEY) === "dark") theme = "dark"; }
 catch { /* Use the default theme when storage is unavailable. */ }
 
@@ -152,6 +159,22 @@ function toggleTheme() {
   for (const element of nodesLayer.children) element.style.background = nodeBackground(getNode(element.dataset.id));
   try { localStorage.setItem(THEME_KEY, theme); }
   catch { /* The theme still works for this session. */ }
+}
+
+function sidebarWidthLimits() {
+  const max = Math.max(MIN_SIDEBAR_WIDTH, main.clientWidth - MIN_WORKSPACE_WIDTH - (sidebarResizer.offsetWidth || 8));
+  sidebarResizer.setAttribute("aria-valuemax", String(max));
+  return max;
+}
+
+function setSidebarWidth(width, persist = true) {
+  const value = Math.round(clamp(width, MIN_SIDEBAR_WIDTH, sidebarWidthLimits()));
+  palette.style.width = `${value}px`;
+  sidebarResizer.setAttribute("aria-valuenow", String(value));
+  if (persist) {
+    try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(value)); }
+    catch { /* The width still works for this session. */ }
+  }
 }
 
 function save() {
@@ -930,6 +953,43 @@ fileInput.addEventListener("change", async () => {
   if (fileInput.files?.[0]) await openFile(fileInput.files[0]);
   fileInput.value = "";
 });
+sidebarResizer.addEventListener("pointerdown", event => {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  sidebarDrag = {
+    pointerId: event.pointerId,
+    clientX: event.clientX,
+    width: palette.getBoundingClientRect().width || Number.parseFloat(palette.style.width) || 185,
+  };
+  sidebarResizer.setPointerCapture(event.pointerId);
+  main.classList.add("sidebar-resizing");
+});
+sidebarResizer.addEventListener("pointermove", event => {
+  if (!sidebarDrag || event.pointerId !== sidebarDrag.pointerId) return;
+  setSidebarWidth(sidebarDrag.width + event.clientX - sidebarDrag.clientX, false);
+});
+function endSidebarResize(event) {
+  if (!sidebarDrag || event.pointerId !== sidebarDrag.pointerId) return;
+  sidebarDrag = null;
+  main.classList.remove("sidebar-resizing");
+  setSidebarWidth(Number.parseFloat(palette.style.width));
+}
+sidebarResizer.addEventListener("pointerup", endSidebarResize);
+sidebarResizer.addEventListener("pointercancel", endSidebarResize);
+sidebarResizer.addEventListener("keydown", event => {
+  const change = { ArrowLeft: -16, ArrowRight: 16, Home: -Infinity, End: Infinity }[event.key];
+  if (change === undefined) return;
+  event.preventDefault();
+  const current = palette.getBoundingClientRect().width || Number.parseFloat(palette.style.width) || 185;
+  setSidebarWidth(change === -Infinity ? MIN_SIDEBAR_WIDTH : change === Infinity ? sidebarWidthLimits() : current + change);
+});
+window.addEventListener("resize", () => {
+  if (palette.style.width) setSidebarWidth(Number.parseFloat(palette.style.width), false);
+  else {
+    sidebarWidthLimits();
+    sidebarResizer.setAttribute("aria-valuenow", String(Math.round(palette.getBoundingClientRect().width || 185)));
+  }
+});
 deleteLinkButton.addEventListener("click", deleteSelected);
 undoButton.addEventListener("click", () => travelHistory(-1));
 redoButton.addEventListener("click", () => travelHistory(1));
@@ -1083,6 +1143,14 @@ document.addEventListener("cut", event => copySelected(event, true));
 document.addEventListener("paste", pasteBubbles);
 
 applyTheme();
+try {
+  const storedWidth = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+  if (storedWidth >= MIN_SIDEBAR_WIDTH) setSidebarWidth(storedWidth, false);
+  else {
+    sidebarWidthLimits();
+    sidebarResizer.setAttribute("aria-valuenow", String(Math.round(palette.getBoundingClientRect().width || 185)));
+  }
+} catch { sidebarWidthLimits(); }
 renderMapList();
 render();
 save();
